@@ -1,0 +1,3566 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>태영아너스 · 임대관리 시스템</title>
+  <meta name="description" content="태영아너스 원룸 201~1306호 임대계약 현황 및 일정 통합 관리 시스템">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+/* ===================== CSS VARIABLES ===================== */
+:root {
+  --bg: #07080e;
+  --bg-card: rgba(255,255,255,0.04);
+  --bg-card2: rgba(255,255,255,0.07);
+  --gold: #ffd32a;
+  --gold2: #ffa502;
+  --blue: #00d2ff;
+  --purple: #9d50bb;
+  --green: #2ed573;
+  --orange: #ffa502;
+  --red: #ff4757;
+  --yellow: #ffd32a;
+  --text: #fff;
+  --dim: rgba(255,255,255,0.50);
+  --dim2: rgba(255,255,255,0.30);
+  --border: rgba(255,255,255,0.08);
+  --border-h: rgba(255,255,255,0.18);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:radial-gradient(ellipse at 20% 0%,#17182e 0%,#07080e 60%),
+             radial-gradient(ellipse at 80% 100%,#0d1a2a 0%,transparent 60%);
+  background-color:var(--bg);
+  color:var(--text);
+  font-family:'Outfit','Noto Sans KR',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:rgba(255,255,255,0.02);}
+::-webkit-scrollbar-thumb{background:rgba(255,211,42,0.3);border-radius:10px;}
+
+#authOverlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;
+  background:radial-gradient(ellipse at 50% 0%,#17182e 0%,#07080e 70%);
+  display:flex;
+
+  flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity 0.5s ease;
+}
+.auth-box{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,211,42,0.15);
+  backdrop-filter:blur(30px);border-radius:28px;
+  padding:48px 52px;text-align:center;max-width:420px;width:90%;
+  box-shadow:0 40px 100px rgba(0,0,0,0.7),0 0 60px rgba(255,211,42,0.05);
+  animation:modalIn 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+.auth-logo{
+  width:80px;height:80px;border-radius:22px;margin:0 auto 20px;
+  background:linear-gradient(135deg,#ffd32a,#ffa502);
+  display:flex;align-items:center;justify-content:center;
+  font-size:2.4rem;box-shadow:0 0 40px rgba(255,211,42,0.4);
+}
+.auth-title{
+  font-size:1.8rem;font-weight:900;letter-spacing:-1px;margin-bottom:4px;
+  background:linear-gradient(90deg,#ffd32a,#ffa502);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.auth-sub{font-size:0.87rem;color:var(--dim);margin-bottom:30px;line-height:1.6;}
+.auth-input{
+  width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,211,42,0.2);
+  color:#fff;padding:18px 20px;border-radius:14px;font-family:inherit;
+  font-size:1.6rem;letter-spacing:0.5em;text-align:center;
+  outline:none;transition:border-color 0.2s;margin-bottom:12px;
+}
+.auth-input:focus{border-color:rgba(255,211,42,0.5);}
+.auth-input.shake{animation:shake 0.4s ease;border-color:var(--red)!important;}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.auth-error{font-size:0.82rem;color:var(--red);min-height:20px;margin-bottom:10px;}
+.auth-btn{
+  width:100%;background:linear-gradient(135deg,#ffd32a,#ffa502);border:none;
+  color:#1a1200;padding:16px;border-radius:14px;font-family:inherit;
+  font-size:1rem;font-weight:800;cursor:pointer;transition:all 0.3s;
+  box-shadow:0 4px 20px rgba(255,211,42,0.3);
+}
+.auth-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(255,211,42,0.5);}
+.auth-hint{font-size:0.74rem;color:rgba(255,255,255,0.2);margin-top:20px;}
+
+/* ===================== FIREBASE SETUP ===================== */
+#fbSetupModal{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:100000;
+  background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;
+}
+#fbSetupModal.open{display:flex;}
+.fb-setup-box{
+  background:#111320;border:1px solid rgba(255,211,42,0.25);border-radius:24px;
+  padding:36px;width:90%;max-width:660px;max-height:92vh;overflow-y:auto;
+  box-shadow:0 30px 80px rgba(0,0,0,0.8);animation:modalIn 0.4s ease;
+}
+.fb-steps{background:rgba(255,211,42,0.05);border:1px solid rgba(255,211,42,0.15);border-radius:12px;padding:16px;margin-bottom:20px;font-size:0.84rem;line-height:1.9;color:var(--dim);}
+.fb-steps a{color:var(--blue);text-decoration:none;}
+.fb-steps a:hover{text-decoration:underline;}
+
+/* ===================== LAYOUT ===================== */
+.container{max-width:1480px;margin:0 auto;padding:28px 22px;}
+
+/* ===================== HEADER ===================== */
+header{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:22px;animation:fadeInDown 0.7s ease-out;flex-wrap:wrap;gap:12px;
+}
+.logo-section{display:flex;align-items:center;gap:14px;}
+.logo-icon{
+  width:50px;height:50px;border-radius:14px;flex-shrink:0;
+  background:linear-gradient(135deg,#ffd32a,#ffa502);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;box-shadow:0 0 28px rgba(255,211,42,0.3);
+}
+.logo-text h1{
+  font-size:1.75rem;font-weight:800;letter-spacing:-1px;
+  background:linear-gradient(90deg,#ffd32a,#ffa502);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.logo-text p{color:var(--dim);font-size:0.8rem;margin-top:1px;}
+.header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+/* BADGES / SMALL BUTTONS */
+.live-badge{
+  display:flex;align-items:center;gap:7px;
+  background:rgba(255,211,42,0.07);border:1px solid rgba(255,211,42,0.25);
+  color:var(--gold);padding:7px 14px;border-radius:50px;font-size:0.8rem;font-weight:600;
+  white-space:nowrap;
+}
+.live-dot{width:7px;height:7px;background:var(--gold);border-radius:50%;box-shadow:0 0 7px var(--gold);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:0.5}}
+.sync-badge{
+  display:flex;align-items:center;gap:7px;
+  background:var(--bg-card);border:1px solid var(--border);
+  padding:7px 14px;border-radius:50px;font-size:0.78rem;font-weight:600;white-space:nowrap;
+}
+.sync-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background 0.4s;}
+.sync-dot.synced{background:var(--green);box-shadow:0 0 7px var(--green);animation:pulse 3s infinite;}
+.sync-dot.saving{background:var(--orange);animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--red);}
+.sync-dot.connecting{background:var(--blue);animation:pulse 1s infinite;}
+.sync-dot.local{background:rgba(255,255,255,0.3);}
+
+.btn{
+  display:flex;align-items:center;gap:6px;
+  border:1px solid var(--border);color:var(--dim);
+  padding:8px 15px;border-radius:11px;font-family:inherit;
+  font-size:0.83rem;font-weight:600;cursor:pointer;transition:all 0.2s;
+  background:var(--bg-card);white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,0.1);color:#fff;}
+.btn-gold{
+  background:linear-gradient(135deg,#ffd32a,#ffa502);border:none;
+  color:#1a1200;font-weight:800;box-shadow:0 4px 18px rgba(255,211,42,0.25);
+}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 7px 28px rgba(255,211,42,0.4);color:#1a1200;}
+.btn-green-o{background:rgba(46,213,115,0.09);border-color:rgba(46,213,115,0.28);color:var(--green);}
+.btn-green-o:hover{background:rgba(46,213,115,0.18);}
+.btn-blue-o{background:rgba(0,210,255,0.09);border-color:rgba(0,210,255,0.28);color:var(--blue);}
+.btn-blue-o:hover{background:rgba(0,210,255,0.18);}
+.btn-red-o{background:rgba(255,71,87,0.09);border-color:rgba(255,71,87,0.28);color:var(--red);}
+.btn-red-o:hover{background:rgba(255,71,87,0.18);}
+
+/* Export dropdown */
+.export-wrap{position:relative;}
+.export-menu{
+  position:absolute;top:calc(100% + 8px);right:0;
+  background:#151825;border:1px solid var(--border);border-radius:14px;
+  padding:8px;min-width:250px;z-index:600;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);display:none;
+}
+.export-menu.open{display:block;animation:fadeIn 0.2s ease;}
+.ex-item{
+  display:flex;align-items:center;gap:10px;padding:10px 13px;
+  border-radius:10px;cursor:pointer;font-size:0.87rem;font-weight:600;
+  transition:background 0.2s;width:100%;background:none;border:none;
+  color:var(--text);font-family:inherit;text-align:left;
+}
+.ex-item:hover{background:rgba(255,255,255,0.07);}
+.ex-item .ex-sub{font-size:0.73rem;color:var(--dim);margin-top:2px;}
+.ex-divider{height:1px;background:var(--border);margin:6px 0;}
+
+/* ===================== TABS ===================== */
+.tab-nav{
+  display:flex;gap:3px;background:rgba(255,255,255,0.03);
+  border:1px solid var(--border);border-radius:14px;padding:4px;
+  margin-bottom:22px;width:fit-content;
+}
+.tab-btn{
+  padding:9px 26px;border-radius:10px;border:none;
+  background:none;color:var(--dim);font-family:inherit;
+  font-size:0.9rem;font-weight:600;cursor:pointer;transition:all 0.25s;
+}
+.tab-btn.active{
+  background:linear-gradient(135deg,rgba(255,211,42,0.16),rgba(255,165,2,0.10));
+  color:var(--gold);border:1px solid rgba(255,211,42,0.22);
+}
+.tab-content{display:none;}
+.tab-content.active{display:block;}
+
+/* ===================== ALERT BANNER ===================== */
+.alert-banner{
+  background:rgba(255,71,87,0.07);border:1px solid rgba(255,71,87,0.22);
+  border-radius:16px;padding:15px 18px;margin-bottom:18px;
+  display:none;flex-direction:column;gap:12px;
+}
+.alert-banner.has-alerts{display:flex;}
+.alert-title{display:flex;align-items:center;gap:9px;font-size:0.88rem;font-weight:800;color:var(--red);}
+.alert-items{display:flex;flex-wrap:wrap;gap:7px;}
+.alert-chip{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 11px;
+  border-radius:20px;font-size:0.75rem;font-weight:700;cursor:pointer;
+  transition:all 0.2s;flex-shrink:0;
+}
+.alert-chip:hover{transform:translateY(-1px);}
+.chip-ce{background:rgba(255,71,87,0.14);border:1px solid rgba(255,71,87,0.28);color:var(--red);}
+.chip-re{background:rgba(255,165,2,0.14);border:1px solid rgba(255,165,2,0.28);color:var(--orange);}
+.chip-ie{background:rgba(0,210,255,0.12);border:1px solid rgba(0,210,255,0.28);color:var(--blue);}
+
+/* ===================== STATS BAR ===================== */
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:15px;margin-bottom:24px;}
+.stat-card{
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+  border-radius:18px;padding:22px;display:flex;align-items:center;gap:16px;
+  transition:transform 0.2s, background 0.2s;
+}
+.stat-card:hover{transform:translateY(-2px);background:rgba(255,255,255,0.04);}
+.stat-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;}
+.stat-info{display:flex;flex-direction:column;flex:1;min-width:0;}
+.stat-val{font-size:1.8rem;font-weight:900;line-height:1;margin-bottom:4px;display:flex;align-items:baseline;gap:5px;}
+.stat-lbl{font-size:0.8rem;font-weight:600;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* Table Layout */
+.room-table-wrap { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); }
+.room-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+.room-table th { background: rgba(255,255,255,0.03); color: var(--dim); padding: 12px; font-weight: 700; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.room-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.room-table tr:last-child td { border-bottom: none; }
+.room-table tr:hover td { background: rgba(255,255,255,0.05); }
+.room-table tr { cursor: pointer; transition: background 0.2s; }
+.rt-badge { display: inline-flex; align-items:center; justify-content:center; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+.rt-vacant { background: rgba(255,255,255,0.1); color: #ccc; }
+.rt-active { background: rgba(46,213,115,0.2); color: var(--green); }
+.rt-check { background: rgba(255,165,2,0.2); color: var(--orange); }
+.rt-extend { background: rgba(0,210,255,0.2); color: #00d2ff; }
+.rt-expire { background: rgba(255,71,87,0.2); color: var(--red); }
+.rent-chk { width:20px; height:20px; cursor:pointer; accent-color:var(--gold); }
+.td-center { text-align:center; }
+.td-right { text-align:right; }
+
+/* ===================== ROOM GRID ===================== */
+.floor-section{margin-bottom:18px;}
+.floor-hdr{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.floor-lbl{font-size:0.73rem;font-weight:800;letter-spacing:0.12em;color:var(--dim);min-width:36px;}
+.floor-line{flex:1;height:1px;background:var(--border);}
+.room-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;}
+.room-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:14px;padding:13px 11px;cursor:pointer;
+  transition:all 0.22s;position:relative;overflow:hidden;
+  min-height:108px;
+}
+.room-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;
+}
+.rc-active::before{background:var(--green);}
+.rc-check::before{background:var(--yellow);}
+.rc-extend::before{background:var(--blue);}
+.rc-expire::before{background:var(--red);}
+.rc-vacant::before{background:rgba(255,255,255,0.13);}
+.room-card:hover{border-color:var(--border-h);transform:translateY(-2px);box-shadow:0 7px 22px rgba(0,0,0,0.3);}
+.rc-active:hover{border-color:rgba(46,213,115,0.28);}
+.rc-check:hover{border-color:rgba(255,211,42,0.28);}
+.rc-extend:hover{border-color:rgba(0,210,255,0.28);}
+.rc-expire:hover{border-color:rgba(255,71,87,0.28);}
+.room-num{font-size:1.05rem;font-weight:800;margin-bottom:5px;}
+.room-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:0.63rem;font-weight:700;padding:2px 6px;border-radius:5px;margin-bottom:4px;
+}
+.rb-active{background:rgba(46,213,115,0.14);color:var(--green);}
+.rb-check{background:rgba(255,211,42,0.14);color:var(--gold);}
+.rb-extend{background:rgba(0,210,255,0.14);color:var(--blue);}
+.rb-expire{background:rgba(255,71,87,0.14);color:var(--red);}
+.rb-vacant{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.38);}
+.room-name{font-size:0.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.room-dates{font-size:0.67rem;color:var(--dim);line-height:1.45;}
+.room-dday{font-size:0.68rem;font-weight:700;margin-top:4px;}
+.dday-u{color:var(--red);}
+.dday-w{color:var(--yellow);}
+.dday-n{color:var(--green);}
+.rc-vacant .room-name{color:var(--dim);font-style:italic;}
+
+/* ===================== MODALS ===================== */
+.modal-overlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.82);
+  backdrop-filter:blur(8px);z-index:1000;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal-box{
+  background:#101220;border:1px solid var(--border);
+  border-radius:24px;padding:34px;width:90%;max-width:640px;
+  box-shadow:0 30px 80px rgba(0,0,0,0.75);
+  animation:modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  max-height:92vh;overflow-y:auto;
+}
+.modal-box.wide{max-width:780px;}
+.modal-box.narrow{max-width:480px;}
+@keyframes modalIn{from{opacity:0;transform:scale(0.9) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal-title{
+  font-size:1.25rem;font-weight:800;margin-bottom:22px;
+  display:flex;align-items:center;gap:9px;
+  background:linear-gradient(90deg,#ffd32a,#ffa502);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.modal-tabs{
+  display:flex;gap:3px;background:rgba(255,255,255,0.04);
+  border-radius:11px;padding:3px;margin-bottom:20px;
+}
+.modal-tab{
+  flex:1;padding:8px 6px;border-radius:8px;border:none;background:none;
+  color:var(--dim);font-family:inherit;font-size:0.83rem;font-weight:600;cursor:pointer;transition:all 0.2s;
+}
+.modal-tab.active{background:rgba(255,211,42,0.1);color:var(--gold);}
+
+/* Form elements */
+.fsec{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--dim);text-transform:uppercase;margin:18px 0 11px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.frow{margin-bottom:13px;}
+.frow label{display:block;font-size:0.78rem;font-weight:700;color:var(--dim);margin-bottom:5px;}
+.frow input,.frow select,.frow textarea{
+  width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  color:var(--text);padding:10px 13px;border-radius:10px;font-family:inherit;
+  font-size:0.88rem;outline:none;transition:border-color 0.2s;
+}
+.frow input:focus,.frow select:focus,.frow textarea:focus{border-color:rgba(255,211,42,0.4);}
+.frow select{cursor:pointer;}
+.frow select option{background:#1a1b2e;}
+.frow textarea{resize:vertical;min-height:68px;}
+.frow input:read-only{opacity:0.65;cursor:default;}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;}
+.form-actions{display:flex;gap:9px;margin-top:18px;}
+.btn-cancel{
+  flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);
+  color:var(--text);padding:12px;border-radius:12px;font-family:inherit;
+  font-size:0.92rem;font-weight:700;cursor:pointer;transition:all 0.2s;
+}
+.btn-cancel:hover{background:rgba(255,255,255,0.1);}
+.btn-save{
+  flex:2;background:linear-gradient(135deg,#ffd32a,#ffa502);border:none;
+  color:#1a1200;padding:12px;border-radius:12px;font-family:inherit;
+  font-size:0.92rem;font-weight:800;cursor:pointer;transition:all 0.3s;
+  box-shadow:0 4px 18px rgba(255,211,42,0.25);
+}
+.btn-save:hover{transform:translateY(-2px);box-shadow:0 7px 28px rgba(255,211,42,0.4);}
+.chk-row{display:flex;align-items:center;gap:9px;}
+.chk-row input[type="checkbox"]{width:17px;height:17px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;}
+.chk-row label{font-size:0.87rem;font-weight:600;margin:0;color:var(--text);cursor:pointer;}
+.report-hint{font-size:0.73rem;color:var(--dim);margin-top:5px;}
+
+/* Color picker */
+.color-picker{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;}
+.color-chip{width:26px;height:26px;border-radius:7px;cursor:pointer;border:2px solid transparent;transition:all 0.2s;}
+.color-chip.selected{border-color:white;transform:scale(1.18);}
+
+/* ===================== SCHEDULE TAB ===================== */
+.sched-layout{display:grid;grid-template-columns:274px 1fr;gap:18px;}
+.sidebar-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  backdrop-filter:blur(20px);border-radius:18px;padding:20px;
+  animation:fadeInLeft 0.6s ease-out both;
+}
+.sidebar-card + .sidebar-card{margin-top:14px;}
+.sc-title{font-size:0.72rem;font-weight:700;letter-spacing:0.1em;color:var(--dim);text-transform:uppercase;margin-bottom:13px;display:flex;justify-content:space-between;align-items:center;}
+.content-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  backdrop-filter:blur(20px);border-radius:18px;padding:24px;
+  animation:fadeIn 0.6s ease-out both;
+}
+
+/* Month nav */
+.month-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px;}
+.month-nav h2{font-size:1.45rem;font-weight:800;}
+.mnav-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.view-toggle{display:flex;background:rgba(255,255,255,0.05);border-radius:10px;padding:3px;}
+.vt-btn{border:none;background:none;color:var(--dim);padding:5px 13px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;}
+.vt-btn.active{background:rgba(255,211,42,0.12);color:var(--gold);}
+.mnav-btns{display:flex;align-items:center;gap:7px;}
+.mnav-btns button{background:rgba(255,255,255,0.06);border:1px solid var(--border);color:var(--text);padding:7px 13px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:0.83rem;transition:all 0.2s;}
+.mnav-btns button:hover{background:rgba(255,255,255,0.12);}
+.mnav-btns .today-btn{background:rgba(255,211,42,0.1);border-color:rgba(255,211,42,0.28);color:var(--gold);font-weight:700;}
+
+/* Calendar grid */
+.cal-header{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:5px;}
+.cal-dow{text-align:center;font-size:0.74rem;font-weight:700;color:var(--dim);padding:5px 0;letter-spacing:0.04em;}
+.cal-dow:first-child{color:var(--red);}
+.cal-dow:last-child{color:#7ec8e3;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.cal-cell{
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+  border-radius:12px;height:116px;padding:7px;transition:all 0.2s;
+  position:relative;cursor:pointer;overflow-y:auto;overflow-x:hidden;
+}
+.cal-cell::-webkit-scrollbar{width:3px;}
+.cal-cell::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px;}
+.cal-cell:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.11);}
+.cal-cell.today-cell{border-color:rgba(255,211,42,0.38);background:rgba(255,211,42,0.04);}
+.cal-cell.other-month-cell{opacity:0.28;}
+.cal-cell.sunday-cell .cal-dn{color:var(--red);}
+.cal-cell.saturday-cell .cal-dn{color:#7ec8e3;}
+.cal-dn{font-size:0.8rem;font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
+.today-badge{font-size:0.58rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1200;padding:2px 5px;border-radius:5px;font-weight:800;}
+.cal-ev{font-size:0.67rem;padding:2px 5px;border-radius:5px;margin-bottom:2px;font-weight:600;cursor:pointer;transition:opacity 0.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.cal-ev:hover{opacity:0.8;}
+
+/* Mini Cal */
+.mini-cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.mini-cal-nav button{background:rgba(255,255,255,0.07);border:none;color:var(--text);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:0.88rem;transition:background 0.2s;}
+.mini-cal-nav button:hover{background:rgba(255,255,255,0.15);}
+.mc-title{font-weight:700;font-size:0.9rem;}
+.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.mc-dow{text-align:center;font-size:0.63rem;font-weight:700;color:var(--dim);padding:3px 0;}
+.mc-day{text-align:center;font-size:0.73rem;padding:4px 1px;border-radius:6px;cursor:pointer;transition:all 0.2s;position:relative;}
+.mc-day:hover{background:rgba(255,255,255,0.08);}
+.mc-day.mc-today{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1200;font-weight:700;}
+.mc-day.mc-has::after{content:'';position:absolute;bottom:1px;left:50%;transform:translateX(-50%);width:3px;height:3px;background:var(--orange);border-radius:50%;}
+.mc-day.mc-other{color:rgba(255,255,255,0.2);}
+.mc-day.mc-sun{color:var(--red);}
+.mc-day.mc-sat{color:#7ec8e3;}
+.mc-day.mc-today.mc-sun,.mc-day.mc-today.mc-sat{color:#1a1200;}
+
+/* Upcoming */
+.upcoming-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;}
+.upcoming-item:last-child{border-bottom:none;}
+.upc-dday{flex-shrink:0;width:40px;height:40px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:0.58rem;font-weight:700;}
+.upc-dday .d{font-size:0.9rem;font-weight:800;}
+.upc-info .title{font-size:0.83rem;font-weight:600;line-height:1.3;}
+.upc-info .meta{font-size:0.7rem;color:var(--dim);margin-top:2px;}
+
+/* List view */
+#listView{display:none;}
+.list-event-row{
+  display:flex;align-items:center;gap:13px;padding:11px 13px;
+  background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
+  border-radius:12px;margin-bottom:7px;transition:all 0.2s;cursor:pointer;
+}
+.list-event-row:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);}
+.ev-date{flex-shrink:0;width:40px;text-align:center;}
+.ev-date .day{font-size:1.2rem;font-weight:800;line-height:1;}
+.ev-date .wd{font-size:0.67rem;color:var(--dim);}
+.ev-div{width:3px;height:34px;border-radius:3px;flex-shrink:0;}
+.ev-body{flex:1;}
+.ev-body .name{font-size:0.88rem;font-weight:600;}
+.ev-body .detail{font-size:0.75rem;color:var(--dim);margin-top:2px;}
+.ev-actions{display:flex;gap:5px;}
+.act-btn{
+  background:rgba(255,255,255,0.06);border:none;color:var(--dim);
+  width:25px;height:25px;border-radius:7px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:0.8rem;transition:all 0.2s;
+}
+.act-btn:hover{background:rgba(255,255,255,0.13);color:var(--text);}
+.act-btn.del:hover{background:rgba(255,71,87,0.2);color:var(--red);}
+.act-btn.done-btn:hover{background:rgba(46,213,115,0.2);color:var(--green);}
+
+/* Completed */
+.completed-sec{margin-top:18px;}
+.completed-hdr{
+  font-size:0.76rem;font-weight:700;color:var(--dim);margin-bottom:9px;
+  padding-bottom:7px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.comp-item{display:flex;align-items:center;gap:9px;padding:7px 11px;background:rgba(255,255,255,0.02);border-radius:8px;margin-bottom:5px;opacity:0.7;}
+.comp-item .ck{color:var(--green);font-size:0.95rem;}
+.comp-item .ttl{font-size:0.82rem;font-weight:600;text-decoration:line-through;flex:1;}
+.comp-item .dt{font-size:0.7rem;color:var(--dim);}
+
+/* List group */
+.list-group{margin-bottom:24px;}
+.list-group-hdr{font-size:0.82rem;font-weight:700;color:var(--dim);padding:7px 0 9px;border-bottom:1px solid var(--border);margin-bottom:9px;}
+
+/* ===================== SETTINGS ===================== */
+.settings-block{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:13px;}
+.settings-lbl{font-size:0.78rem;font-weight:700;color:var(--dim);margin-bottom:10px;}
+
+/* ===================== TOOLTIP ===================== */
+[data-tip]{position:relative;}
+[data-tip]:hover::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100%+7px);left:50%;transform:translateX(-50%);
+  background:#1e2235;border:1px solid var(--border);color:var(--text);
+  padding:5px 11px;border-radius:8px;font-size:0.75rem;white-space:nowrap;
+  z-index:9999;pointer-events:none;box-shadow:0 7px 22px rgba(0,0,0,0.5);
+}
+
+/* ===================== MISC ===================== */
+.empty-state{text-align:center;padding:44px 20px;color:var(--dim);}
+.empty-state .ico{font-size:2.6rem;margin-bottom:9px;}
+.empty-state p{font-size:0.88rem;}
+.info-box{background:rgba(0,210,255,0.06);border:1px solid rgba(0,210,255,0.18);border-radius:10px;padding:13px;margin-bottom:15px;font-size:0.83rem;line-height:1.7;color:var(--dim);}
+.warn-box{background:rgba(255,211,42,0.06);border:1px solid rgba(255,211,42,0.18);border-radius:10px;padding:13px;margin-bottom:15px;font-size:0.83rem;line-height:1.7;color:var(--dim);}
+
+/* ===================== ANIMATIONS ===================== */
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeInLeft{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===================== SORT HEADER ===================== */
+.sort-bar{
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+  background:rgba(255,255,255,0.02);border:1px solid var(--border);
+  border-radius:13px;padding:9px 14px;margin-bottom:14px;
+}
+.sort-bar-lbl{font-size:0.73rem;font-weight:700;color:var(--dim);white-space:nowrap;}
+.sort-chip{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:6px 12px;border-radius:9px;border:1px solid var(--border);
+  background:rgba(255,255,255,0.04);color:var(--dim);
+  font-family:inherit;font-size:0.78rem;font-weight:600;
+  cursor:pointer;transition:all 0.2s;white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
+  min-height:36px;
+}
+.sort-chip:hover,.sort-chip:active{background:rgba(255,255,255,0.09);color:#fff;border-color:var(--border-h);}
+.sort-chip.active{background:rgba(255,211,42,0.12);border-color:rgba(255,211,42,0.3);color:var(--gold);}
+.sort-arrow{font-size:0.7rem;transition:transform 0.2s;}
+.sort-chip.active.desc .sort-arrow{transform:rotate(180deg);}
+
+/* Auth loading state */
+.auth-loading{opacity:0.5;pointer-events:none;}
+.auth-ready-hint{font-size:0.74rem;color:var(--gold);margin-top:8px;min-height:20px;}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:1200px){.stats-bar{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:1000px){.sched-layout{grid-template-columns:1fr;}.room-grid{grid-template-columns:repeat(4,1fr);}}
+@media(max-width:760px){
+  .room-grid{grid-template-columns:repeat(3,1fr);}
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .fg2,.fg3{grid-template-columns:1fr;}
+  .modal-box{padding:22px;}
+  .auth-box{padding:30px 24px;}
+  .sort-bar{padding:8px 10px;gap:5px;}
+  .sort-chip{padding:5px 9px;font-size:0.75rem;}
+  .header-right{gap:6px;}
+  .logo-text h1{font-size:1.4rem;}
+  .logo-text p{font-size:0.73rem;}
+  .tab-btn{padding:8px 14px;font-size:0.82rem;}
+  .modal-box.wide{max-width:100%;}
+}
+@media(max-width:500px){
+  .room-grid{grid-template-columns:repeat(2,1fr);}
+  .stats-bar{grid-template-columns:repeat(2,1fr);}
+  .sort-bar{gap:4px;}
+  .sort-chip{padding:5px 8px;font-size:0.72rem;}
+}
+/* Bulk Delete Modal */
+.bd-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(80px, 1fr)); gap:10px; margin:15px 0; max-height:400px; overflow-y:auto; }
+.bd-item { display:flex; align-items:center; gap:6px; background:var(--surface); padding:8px; border-radius:6px; cursor:pointer; border:1px solid var(--border); }
+.bd-item:hover { border-color:var(--yellow); }
+.bd-item input { margin:0; cursor:pointer; }
+/* Dropdown Menu */
+.dropdown { position: relative; display: inline-block; }
+.dropdown-content {
+  display: none; position: absolute; background-color: var(--surface);
+  min-width: 180px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5); z-index: 1000;
+  border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 5px; right: 0;
+}
+.dropdown-content a, .dropdown-content label {
+  color: var(--text); padding: 10px 14px; text-decoration: none; display: block; font-size: 0.85rem; font-weight: 600; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.dropdown-content a:last-child, .dropdown-content label:last-child { border-bottom: none; }
+.dropdown-content a:hover, .dropdown-content label:hover { background-color: rgba(255,255,255,0.08); }
+.dropdown.show .dropdown-content { display: block; }
+
+/* P&L Styles */
+.pnl-wrap { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+.pnl-box { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.pnl-box h3 { padding:12px; margin:0; font-size:1.05rem; background:rgba(255,255,255,0.04); border-bottom:1px solid var(--border); text-align:center; }
+.pnl-row { display:flex; justify-content:space-between; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.03); font-size:0.85rem; }
+.pnl-row:last-child { border-bottom:none; }
+.pnl-row.total { font-weight:800; background:rgba(255,255,255,0.06); font-size:0.95rem; }
+@media(max-width:760px) { .pnl-wrap { grid-template-columns:1fr; } }
+
+/* Month Picker Styles */
+.month-picker {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  color-scheme: dark;
+}
+.month-picker:hover, .month-picker:focus {
+  border-color: var(--gold);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Select Dropdown Styles for Transaction Grid */
+.tx-select {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23999%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 12px;
+  padding-right: 26px;
+}
+.tx-select:hover, .tx-select:focus {
+  border-color: var(--gold);
+  background-color: rgba(255, 255, 255, 0.09);
+}
+.tx-select option {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+/* ====== MOBILE RESPONSIVE ====== */
+@media (max-width: 768px) {
+  header { flex-direction: column; height: auto; padding: 15px; gap: 15px; }
+  .header-left, .header-right { flex-direction: column; width: 100%; align-items: center; }
+  #adminCtrl { justify-content: center; width: 100%; gap: 6px; }
+  .tab-btn { font-size: 0.9rem; padding: 10px 14px; }
+  .tabs { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
+  .stats-bar { grid-template-columns: 1fr !important; }
+  .modal-box, .modal-box.wide { width: 95%; max-height: 90vh; padding: 15px; }
+  .fg2, .fg3 { grid-template-columns: 1fr; gap: 10px; }
+  .room-table th, .room-table td { font-size: 0.85rem; padding: 8px 6px; }
+  .room-table input { font-size: 0.85rem; width: 100% !important; }
+  .pnl-row { font-size: 0.9rem; }
+  h2 { font-size: 1.05rem !important; }
+}
+</style>
+</head>
+<body>
+<!-- ====== FIREBASE SETUP MODAL ====== -->
+<div id="fbSetupModal">
+  <div class="fb-setup-box">
+    <div style="font-size:1.35rem;font-weight:900;color:var(--gold);margin-bottom:14px;">🔥 Firebase 설정</div>
+    <div class="fb-steps">
+      <b style="color:var(--gold);">처음 사용 시 Firebase 설정이 필요합니다.</b><br>
+      1. <a href="https://console.firebase.google.com" target="_blank">Firebase Console</a> 접속 → 프로젝트 추가 (예: taeyoung-rental)<br>
+      2. 실시간 데이터베이스 추가 → 데이터베이스 생성 → 테스트 모드<br>
+      3. 프로젝트 설정(톱니바퀴) → 일반 → 내 앱 → 웹 앱(<code>&lt;/&gt;</code>) → 앱 등록<br>
+      4. firebaseConfig 값을 아래에 입력하세요
+    </div>
+    <div class="fg2">
+      <div class="frow"><label>API Key</label><input id="fb_apiKey" placeholder="AIzaSy..."></div>
+      <div class="frow"><label>Auth Domain</label><input id="fb_authDomain" placeholder="xxx.firebaseapp.com"></div>
+    </div>
+    <div class="frow"><label>Database URL ⭐ 필수</label><input id="fb_databaseURL" placeholder="https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app"></div>
+    <div class="fg2">
+      <div class="frow"><label>Project ID</label><input id="fb_projectId" placeholder="taeyoung-rental"></div>
+      <div class="frow"><label>Storage Bucket</label><input id="fb_storageBucket" placeholder="xxx.appspot.com"></div>
+    </div>
+    <div class="fg2">
+      <div class="frow"><label>Messaging Sender ID</label><input id="fb_messagingSenderId" placeholder="123456789"></div>
+      <div class="frow"><label>App ID</label><input id="fb_appId" placeholder="1:xxx:web:xxx"></div>
+    </div>
+    <div style="display:flex;gap:9px;margin-top:16px;">
+      <button onclick="skipFirebase()" class="btn" style="flex:1;justify-content:center;padding:12px;">🖥 로컬 전용 사용</button>
+      <button onclick="saveFirebaseConfig()" class="btn btn-gold" style="flex:2;justify-content:center;padding:12px;">🔥 Firebase 연결</button>
+    </div>
+    <p style="font-size:0.73rem;color:var(--dim);margin-top:11px;text-align:center;">로컬 전용 시 JSON 백업으로만 데이터 보존됩니다 (다른 기기에서 공유 불가)</p>
+  </div>
+
+</div>
+
+<!-- ====== AUTH OVERLAY ====== -->
+<div id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">🏢</div>
+    <div class="auth-title">태영아너스</div>
+    <div class="auth-sub">임대관리 시스템<br>비밀번호를 입력해 주세요</div>
+    <input class="auth-input" id="authInput" type="password" maxlength="20"
+      placeholder="● ● ● ●" onkeydown="if(event.key==='Enter')submitAuth()" autocomplete="off">
+    <div class="auth-error" id="authError"></div>
+    <button class="auth-btn" id="authBtn" onclick="submitAuth()">🔐 입 장</button>
+    <div class="auth-hint">관리자 또는 공유 비밀번호를 입력하세요</div>
+  </div>
+</div>
+
+<!-- ====== BULK DELETE MODAL ====== -->
+<div class="modal-overlay" id="bulkDeleteModal">
+  <div class="modal-content" style="max-width:500px;">
+    <div class="modal-hdr">
+      <h2>🗑 데이터 일괄 삭제</h2>
+      <button class="close-btn" onclick="closeBulkDeleteModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--dim);font-size:0.9rem;margin-bottom:10px;">삭제할 호실을 선택하세요. (현재 데이터가 있는 호실만 표시됩니다)</p>
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <button class="btn btn-outline" onclick="toggleAllBulkDelete(true)">전체 선택</button>
+        <button class="btn btn-outline" onclick="toggleAllBulkDelete(false)">전체 해제</button>
+      </div>
+      <div class="bd-list" id="bdList"></div>
+    </div>
+    <div class="modal-footer" style="margin-top:15px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeBulkDeleteModal()" style="margin-right:10px;">취소</button>
+      <button class="btn" style="background:var(--red);color:white;" onclick="execBulkDelete()">선택 삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="mainApp" style="display:none;">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-section">
+      <div class="logo-icon">🏢</div>
+      <div class="logo-text">
+        <h1>태영아너스 (72세대)</h1>
+        <p>원룸관리시스템</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div><span id="dateDisplay"></span></div>
+      <div class="sync-badge" id="syncBadge"><div class="sync-dot local" id="syncDot"></div><span id="syncText">오프라인</span></div>
+      <!-- Admin Controls -->
+      <div id="adminCtrl" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display:none;">
+        <button class="btn btn-green-o" onclick="exportStatusExcel()">📥 엑셀 데이터 추출</button>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label style="cursor:pointer; font-size:0.8rem; color:var(--dim); display:flex; align-items:center; gap:4px; margin-bottom:0;">
+            <input type="checkbox" id="chkPrevContract"> 직전계약용
+          </label>
+          <label class="btn btn-outline" style="cursor:pointer;margin-bottom:0;color:var(--yellow);border-color:var(--yellow);">
+            ✨ 엑셀 자동입력 <input type="file" style="display:none" accept=".xlsx, .xls" onchange="importExcelData(event)">
+          </label>
+        </div>
+        
+        <div class="export-wrap" id="exportWrap">
+          <button class="btn btn-outline" onclick="toggleExportMenu()" id="btnExport">⚙️ 관리자 메뉴 ▼</button>
+          <div class="export-menu" id="exportMenu" style="width:220px;">
+            <button class="ex-item" onclick="openYearlyModal()">
+              <span>📅</span>
+              <div><div style="font-weight:700;">과거 완료 일정조회</div></div>
+            </button>
+            <button class="ex-item" onclick="openSettings()">
+              <span>⚙️</span>
+              <div><div style="font-weight:700;">설정 (비밀번호/FB)</div></div>
+            </button>
+            <button class="ex-item" onclick="openTaxModal()">
+              <span>🏛</span>
+              <div><div style="font-weight:700;color:var(--blue);">세무신고용 엑셀 추출</div></div>
+            </button>
+            <div class="ex-divider"></div>
+            <button class="ex-item" onclick="backupJSON()">
+              <span>💾</span>
+              <div><div style="font-weight:700;color:var(--gold);">데이터 백업 (JSON)</div></div>
+            </button>
+            <button class="ex-item" onclick="document.getElementById('importFile').click()">
+              <span>📂</span>
+              <div><div style="font-weight:700;color:var(--orange);">데이터 복원 (JSON)</div></div>
+            </button>
+            <div class="ex-divider"></div>
+            <button class="ex-item" onclick="openBulkDeleteModal()">
+              <span>🗑</span>
+              <div><div style="font-weight:700;color:var(--red);">데이터 일괄 삭제</div></div>
+            </button>
+          </div>
+        </div>
+        <button class="btn btn-gold" onclick="openAddSched()">＋ 일정 추가</button>
+      </div>
+      <!-- Viewer indicator -->
+      <div id="viewerInd" style="display:none;">
+        <div class="live-badge" style="background:rgba(157,80,187,0.1);border-color:rgba(157,80,187,0.3);color:#c77dff;">👁 열람 모드</div>
+      </div>
+      <button class="btn" onclick="logout()" data-tip="로그아웃">🚪</button>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('contract')" id="tabC">📋 계약 현황</button>
+    <button class="tab-btn" onclick="switchTab('schedule')" id="tabS">📅 일정표</button>
+    <button class="tab-btn" onclick="switchTab('rent')" id="tabR">💰 월세 납부</button>
+    <button class="tab-btn" onclick="switchTab('tx')" id="tabT">🏦 거래내역</button>
+    <button class="tab-btn" onclick="switchTab('pnl')" id="tabP">📊 수지분석</button>
+  </div>
+
+  <!-- ===== CONTRACT TAB ===== -->
+  <div class="tab-content active" id="contractTab">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+      <h2 style="font-size:1.15rem; margin:0;">📋 호실별 계약 현황</h2>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">조회 시점</label>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('mainMonth', -1)">◀</button>
+          <input type="month" id="mainMonth" class="month-picker" onchange="refreshUI()" style="margin:0;">
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('mainMonth', 1)">▶</button>
+        </div>
+      </div>
+    </div>
+    <!-- Alert Banner -->
+    <div class="alert-banner" id="alertBanner">
+      <div class="alert-title"><span>⚠️</span> 즉시 확인 필요</div>
+      <div class="alert-items" id="alertItems"></div>
+    </div>
+    <!-- Stats -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,255,255,0.05);">🏠</div>
+        <div class="stat-info"><div class="stat-val">72<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">세대</span></div><div class="stat-lbl">전체 세대</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(46,213,115,0.15);color:var(--green);">✅</div>
+        <div class="stat-info"><div class="stat-val" id="statActive">0</div><div class="stat-lbl">계약중</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,165,2,0.15);color:var(--orange);">🔔</div>
+        <div class="stat-info"><div class="stat-val" id="statCheck">0</div><div class="stat-lbl">재계약 확인 필요</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,71,87,0.15);color:var(--red);">📋</div>
+        <div class="stat-info"><div class="stat-val" id="statReport">0</div><div class="stat-lbl">계약미신고 (임박 <span id="statReportUrgent">0</span>)</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,255,255,0.05);color:var(--dim);">🌫️</div>
+        <div class="stat-info"><div class="stat-val" id="statVacant">0</div><div class="stat-lbl">공실</div></div>
+      </div>
+    </div>
+    <div class="sort-bar" id="sortBar" style="display:none;"></div>
+    <!-- Room Grid -->
+    <div id="roomGrid"></div>
+  </div>
+
+  <!-- ===== SCHEDULE TAB ===== -->
+  <div class="tab-content" id="scheduleTab">
+    <!-- Schedule Alerts -->
+    <div class="alert-banner" id="schedAlertBanner">
+      <div class="alert-title"><span>⚠️</span> 3개월 이내 주의 일정</div>
+      <div class="alert-items" id="schedAlertItems"></div>
+    </div>
+    <div class="sched-layout">
+      <!-- Sidebar -->
+      <aside>
+        <div class="sidebar-card">
+          <div class="sc-title"><span>📅 캘린더</span></div>
+          <div class="mini-cal-nav">
+            <button onclick="mcPrev()">◀</button>
+            <span class="mc-title" id="mcTitle"></span>
+            <button onclick="mcNext()">▶</button>
+          </div>
+          <div class="mc-grid" id="mcGrid"></div>
+        </div>
+        <div class="sidebar-card">
+          <div class="sc-title"><span>⏰ 14일 이내 일정</span></div>
+          <div id="upcomingList"></div>
+        </div>
+      </aside>
+      <!-- Main Calendar -->
+      <div>
+        <div class="content-card">
+          <div class="month-nav">
+            <h2 id="monthTitle"></h2>
+            <div class="mnav-right">
+              <div class="view-toggle">
+                <button class="vt-btn active" onclick="setView('calendar')" id="vCalBtn">달력</button>
+                <button class="vt-btn" onclick="setView('list')" id="vListBtn">목록</button>
+              </div>
+              <div class="mnav-btns">
+                <button onclick="prevMonth()">◀</button>
+                <button class="today-btn" onclick="goToday()">오늘</button>
+                <button onclick="nextMonth()">▶</button>
+              </div>
+            </div>
+          </div>
+          <!-- Calendar -->
+          <div id="calView">
+            <div class="cal-header">
+              <div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div>
+              <div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+          </div>
+          <!-- List View -->
+          <div id="listView"></div>
+          <!-- Completed -->
+          <div class="completed-sec">
+            <div class="completed-hdr">
+              <span>✅ 이번 달 완료</span>
+              <button onclick="openYearlyModal()" class="btn" style="padding:3px 9px;font-size:0.73rem;">연간 보기</button>
+            </div>
+            <div id="completedList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== CONTRACT MODAL ====== -->
+<div class="modal-overlay" id="contractModal">
+  <div class="modal-box wide">
+    <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
+      <span id="cmTitle">🏠 계약 정보</span>
+      <div style="display:flex; align-items:center; gap:5px;">
+        <select id="contractSelector" onchange="loadContractForm(this.value)" style="padding:4px; border-radius:4px; font-size:0.85rem; background:rgba(255,255,255,0.1); color:white; border:none; outline:none; max-width: 150px;"></select>
+        <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.75rem;" onclick="addNewContract()">+ 계약</button>
+        <button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; color:var(--red); border-color:rgba(255,71,87,0.3);" onclick="delContract()">삭제</button>
+      </div>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="cTab('curr')" id="cTabCurr">계약 이력</button>
+      <button class="modal-tab" onclick="cTab('prev')" id="cTabPrev" style="display:none;">직전 계약</button>
+      <button class="modal-tab" onclick="cTab('ins')" id="cTabIns">보증보험</button>
+    </div>
+
+    <!-- Current Contract -->
+    <div id="cFormCurr">
+      <div class="fsec">👤 입주자 정보</div>
+      <div class="fg2">
+        <div class="frow"><label>성명</label><input id="cf_name" placeholder="홍길동"></div>
+        <div class="frow"><label>전화번호</label><input id="cf_phone" placeholder="010-0000-0000"></div>
+      </div>
+      <div class="frow" id="cfSsnRow">
+        <label>주민등록번호 <span style="font-size:0.73rem;color:var(--red);">[관리자 전용]</span></label>
+        <input id="cf_ssn" placeholder="000000-0000000" maxlength="14">
+      </div>
+
+      <div class="fsec" id="cfFinSec">💰 계약 조건 <span style="font-size:0.73rem;color:var(--red);">[관리자 전용]</span></div>
+      <div class="fg3" id="cfFinRow">
+        <div class="frow"><label>보증금 (만원)</label><input id="cf_deposit" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>월세 (만원)</label><input id="cf_monthly" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>관리비 (만원)</label><input id="cf_maint" type="number" min="0" placeholder="0"></div>
+      </div>
+
+      <div class="fsec">📅 계약 기간</div>
+      <div class="fg3">
+        <div class="frow"><label>계약서 작성일</label><input id="cf_cdate" type="date" onchange="updateReportDeadline()"></div>
+        <div class="frow"><label>계약 시작일</label><input id="cf_sdate" type="date"></div>
+        <div class="frow"><label>계약 만료일</label><input id="cf_edate" type="date"></div>
+      </div>
+
+      <div class="fsec">📋 계약신고 현황</div>
+      <div class="fg2">
+        <div class="frow">
+          <div class="chk-row">
+            <input type="checkbox" id="cf_reportDone">
+            <label for="cf_reportDone">민간임대 계약신고 완료</label>
+          </div>
+          <div class="report-hint" id="reportDeadlineHint"></div>
+        </div>
+        <div class="frow"><label>신고 완료일</label><input id="cf_rdate" type="date"></div>
+      </div>
+
+      <div class="fsec">🔄 재계약 상태</div>
+      <div class="frow">
+        <label>재계약 처리 결과</label>
+        <select id="cf_renewal">
+          <option value="">-- 자동 판단 (만료일 기준) --</option>
+          <option value="extend">🔵 연장 확정</option>
+          <option value="expire">❌ 만기종료</option>
+        </select>
+      </div>
+      <div class="frow"><label>메모 / 특이사항</label><textarea id="cf_memo" placeholder="관리 메모, 특이사항..."></textarea></div>
+    </div>
+
+    <!-- Previous Contract -->
+    <div id="cFormPrev" style="display:none;">
+      <div class="warn-box">
+        세무신고용 추출 시 직전 계약이 자동 포함됩니다. 기준연도에 해당하는 직전 계약 정보를 입력하세요.
+      </div>
+      <div class="fg2">
+        <div class="frow"><label>성명</label><input id="pf_name" placeholder="홍길동"></div>
+        <div class="frow"><label>전화번호</label><input id="pf_phone" placeholder="010-0000-0000"></div>
+      </div>
+      <div class="frow"><label>주민등록번호</label><input id="pf_ssn" placeholder="000000-0000000"></div>
+      <div class="fg3">
+        <div class="frow"><label>보증금 (만원)</label><input id="pf_deposit" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>월세 (만원)</label><input id="pf_monthly" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>관리비 (만원)</label><input id="pf_maint" type="number" min="0" placeholder="0"></div>
+      </div>
+      <div class="fg2">
+        <div class="frow"><label>계약 시작일</label><input id="pf_sdate" type="date"></div>
+        <div class="frow"><label>계약 만료일</label><input id="pf_edate" type="date"></div>
+      </div>
+      <div class="frow"><label>메모</label><textarea id="pf_memo" placeholder=""></textarea></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+        <button onclick="clearPrev()" class="btn btn-red-o" style="font-size:0.82rem;">🗑 직전 계약 삭제</button>
+      </div>
+    </div>
+
+    <!-- Insurance -->
+    <div id="cFormIns" style="display:none;">
+      <div class="fsec">🛡 보증보험 정보</div>
+      <div class="fg2">
+        <div class="frow"><label>보증보험 만료일</label><input id="if_exp" type="date"></div>
+        <div class="frow"><label>보험사</label><input id="if_co" placeholder="SGI 서울보증 / HUG 등"></div>
+      </div>
+      <div class="fg2">
+        <div class="frow"><label>증권 번호</label><input id="if_no" placeholder="증권번호"></div>
+        <div class="frow"><label>보험금액 (만원)</label><input id="if_amt" type="number" min="0" placeholder="0"></div>
+      </div>
+      <div class="frow"><label>메모</label><textarea id="if_memo" placeholder="보증보험 관련 메모..."></textarea></div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeContractModal()">닫기</button>
+      <button class="btn-save" id="cmSaveBtn" onclick="saveContract()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== TAX EXPORT MODAL ====== -->
+<div class="modal-overlay" id="taxModal">
+  <div class="modal-box narrow">
+    <div class="modal-title">🏛 세무신고용 엑셀</div>
+    <div class="info-box">
+      <b style="color:var(--blue);">사업장 현황신고용</b>으로 기준연도에 걸친 <b>모든 계약(현재+직전)</b>을 포함합니다.<br>
+      공실 기간은 <b>"공실"</b>로 자동 표기됩니다.
+    </div>
+    <div class="frow">
+      <label>신고 기준연도 선택</label>
+      <select id="taxYear"></select>
+    </div>
+    <p style="font-size:0.79rem;color:var(--dim);margin-bottom:16px;">예: 2026년에 2025년 현황신고 → 기준연도 <b style="color:var(--gold);">2025</b> 선택</p>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeTaxModal()">취소</button>
+      <button class="btn-save" onclick="exportTaxExcel()">📊 엑셀 추출</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== SCHEDULE MODAL ====== -->
+<div class="modal-overlay" id="schedModal">
+  <div class="modal-box">
+    <div class="modal-title" id="smTitle">📅 일정 추가</div>
+    <div class="frow"><label>일정 제목 *</label><input id="sm_title" placeholder="일정 제목을 입력하세요"></div>
+    <div class="fg2">
+      <div class="frow"><label>날짜 *</label><input id="sm_date" type="date"></div>
+      <div class="frow">
+        <label>카테고리</label>
+        <select id="sm_cat">
+          <option value="manual">📝 기타</option>
+          <option value="contract_report">📋 계약신고</option>
+          <option value="insurance">🛡 보증보험</option>
+          <option value="repair">🔧 수선/하자</option>
+          <option value="meeting">💬 협의/미팅</option>
+          <option value="payment">💰 납부/수납</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow"><label>관련 호실 (선택)</label><input id="sm_room" placeholder="예: 501 (비워두면 전체 일정)"></div>
+    <div class="frow"><label>메모</label><textarea id="sm_memo" placeholder="상세 내용..."></textarea></div>
+    <div class="frow">
+      <label>색상</label>
+      <div class="color-picker" id="colorPicker">
+        <div class="color-chip selected" style="background:#00d2ff" onclick="selectColor('#00d2ff')" data-c="#00d2ff"></div>
+        <div class="color-chip" style="background:#ffd32a" onclick="selectColor('#ffd32a')" data-c="#ffd32a"></div>
+        <div class="color-chip" style="background:#2ed573" onclick="selectColor('#2ed573')" data-c="#2ed573"></div>
+        <div class="color-chip" style="background:#ffa502" onclick="selectColor('#ffa502')" data-c="#ffa502"></div>
+        <div class="color-chip" style="background:#ff4757" onclick="selectColor('#ff4757')" data-c="#ff4757"></div>
+        <div class="color-chip" style="background:#9d50bb" onclick="selectColor('#9d50bb')" data-c="#9d50bb"></div>
+        <div class="color-chip" style="background:#ff6b9d" onclick="selectColor('#ff6b9d')" data-c="#ff6b9d"></div>
+        <div class="color-chip" style="background:#7ec8e3" onclick="selectColor('#7ec8e3')" data-c="#7ec8e3"></div>
+      </div>
+    </div>
+    <input type="hidden" id="sm_editId">
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="closeSchedModal()">취소</button>
+      <button class="btn-save" onclick="saveSched()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+  <!-- ===== RENT TAB ===== -->
+  <div class="tab-content" id="rentTab">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h2 style="font-size:1.15rem; margin:0;">💰 월세 납부 현황</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">기준월</label>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.8rem; margin-right:8px;" onclick="exportRentExcel()">📥 엑셀</button>
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('rentMonth', -1)">◀</button>
+          <input type="month" id="rentMonth" class="month-picker" onchange="renderRentGrid()" style="margin:0;">
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('rentMonth', 1)">▶</button>
+        </div>
+      </div>
+    </div>
+    <div class="stats-bar" style="grid-template-columns:repeat(2,1fr);">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(0,210,255,0.15);color:#00d2ff;">💰</div>
+        <div class="stat-info"><div class="stat-val" id="rentIncome">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl" id="rentIncomeMonth">당월 납부 완료액</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,71,87,0.15);color:var(--red);">⚠️</div>
+        <div class="stat-info"><div class="stat-val" id="rentUnpaid" style="color:var(--red);">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">총 미납액 (당월미납 + 기존미납)</div></div>
+      </div>
+    </div>
+    
+    <div style="background:var(--surface); border-radius:12px; border:1px solid var(--border); overflow-x:auto;">
+      <table class="room-table">
+        <thead>
+          <tr>
+            <th>호실</th>
+            <th>임차인</th>
+            <th class="td-right">보증금</th>
+            <th class="td-right">월세+관리비 합계</th>
+            <th class="td-center">기존 미납액 (직접입력)</th>
+            <th class="td-center">당월 납부확인</th>
+            <th class="td-center">비고</th>
+          </tr>
+        </thead>
+        <tbody id="rentGridBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== TRANSACTION TAB ===== -->
+  <div class="tab-content" id="txTab">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <div style="display:flex; gap:10px; align-items:center;">
+        <h2 style="font-size:1.15rem; margin:0;">🏦 거래내역</h2>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.8rem; margin-right:8px;" onclick="exportTxExcel()">📥 엑셀</button>
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('txMonth', -1)">◀</button>
+          <input type="month" id="txMonth" class="month-picker" onchange="renderTxGrid()" style="margin:0;">
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('txMonth', 1)">▶</button>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-red-o" onclick="bulkDeleteTx()" style="padding:6px 12px; font-size:0.8rem; margin:0;">🗑 일괄 삭제</button>
+        <label class="btn btn-gold" style="cursor:pointer;margin-bottom:0;">
+          ✨ 통장엑셀 업로드 <input type="file" style="display:none" accept=".xlsx, .xls" onchange="importTxExcelData(event)">
+        </label>
+      </div>
+    </div>
+    
+    <div style="background:var(--surface); border-radius:12px; border:1px solid var(--border); overflow-x:auto;">
+      <table class="room-table">
+        <thead>
+          <tr>
+            <th onclick="setSortTx('date')" style="cursor:pointer;" title="클릭하여 정렬">날짜 <span id="txSortArr_date">▼</span></th>
+            <th onclick="setSortTx('desc')" style="cursor:pointer;" title="클릭하여 정렬">거래내용 (적요) <span id="txSortArr_desc" style="opacity:0.2;">▼▲</span></th>
+            <th>매칭 호실</th>
+            <th class="td-right" onclick="setSortTx('income')" style="cursor:pointer;">수입 <span id="txSortArr_income" style="opacity:0.2;">▼▲</span></th>
+            <th class="td-right" onclick="setSortTx('expense')" style="cursor:pointer;">지출 <span id="txSortArr_expense" style="opacity:0.2;">▼▲</span></th>
+            <th class="td-right">잔액</th>
+            <th class="td-center" onclick="setSortTx('category')" style="cursor:pointer;">계정 (분류) <span id="txSortArr_category" style="opacity:0.2;">▼▲</span></th>
+            <th class="td-center">삭제</th>
+          </tr>
+        </thead>
+        <tbody id="txGridBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== P&L TAB ===== -->
+  <div class="tab-content" id="pnlTab">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+      <h2 style="font-size:1.15rem; margin:0;">📊 수지분석 대시보드</h2>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">기준월</label>
+        <div style="display:flex; align-items:center; gap:4px;">
+          <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.8rem; margin-right:8px;" onclick="exportPnlExcel()">📥 엑셀</button>
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('pnlMonth', -1)">◀</button>
+          <input type="month" id="pnlMonth" class="month-picker" onchange="renderPnl()" style="margin:0;">
+          <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('pnlMonth', 1)">▶</button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="stats-bar" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(0,210,255,0.15);color:#00d2ff;">💰</div>
+        <div class="stat-info"><div class="stat-val" id="pnlTotalIncome">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">총 수입</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,71,87,0.15);color:var(--red);">📉</div>
+        <div class="stat-info"><div class="stat-val" id="pnlTotalExpense" style="color:var(--red);">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">총 지출</div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(46,213,115,0.15);color:var(--green);">✨</div>
+        <div class="stat-info"><div class="stat-val" id="pnlNetProfit" style="color:var(--green);">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">순수익</div></div>
+      </div>
+    </div>
+
+    <div class="pnl-wrap">
+      <!-- Income Box -->
+      <div class="pnl-box">
+        <h3 style="color:#00d2ff;">수입 명세</h3>
+        <div id="pnlIncomeList"></div>
+      </div>
+      <!-- Expense Box -->
+      <div class="pnl-box">
+        <h3 style="color:var(--red);">지출 명세</h3>
+        <div id="pnlExpenseList"></div>
+      </div>
+    </div>
+
+    <div class="pnl-wrap" style="margin-top:15px;">
+      <!-- Deposit Income Box -->
+      <div class="pnl-box" style="border-color:rgba(157, 80, 187, 0.4);">
+        <h3 style="color:#9d50bb; background:rgba(157, 80, 187, 0.08);">보증금 입금 (부채 증가)</h3>
+        <div id="pnlDepIncList"></div>
+      </div>
+      <!-- Deposit Expense Box -->
+      <div class="pnl-box" style="border-color:rgba(157, 80, 187, 0.4);">
+        <h3 style="color:#9d50bb; background:rgba(157, 80, 187, 0.08);">보증금 반환 (부채 감소)</h3>
+        <div id="pnlDepExpList"></div>
+      </div>
+    </div>
+  </div>
+
+<!-- ====== EVENT DETAIL MODAL ====== -->
+<div class="modal-overlay" id="evDetailModal">
+  <div class="modal-box narrow">
+    <div class="modal-title" id="evDetailTitle"></div>
+    <div id="evDetailContent" style="font-size:0.88rem;color:var(--dim);line-height:1.85;"></div>
+    <div class="form-actions" style="margin-top:18px;">
+      <button class="btn-cancel" onclick="closeEvDetail()">닫기</button>
+      <button class="btn-save" id="evDoneBtn" onclick="markDone()" style="flex:1;">✅ 완료</button>
+      <button id="evDelBtn" onclick="delFromDetail()" style="padding:12px 18px;background:rgba(255,71,87,0.1);border:1px solid rgba(255,71,87,0.28);color:var(--red);border-radius:12px;font-family:inherit;font-weight:700;cursor:pointer;">🗑 삭제</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== SETTINGS MODAL ====== -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box narrow">
+    <div class="modal-title">⚙️ 설정</div>
+    <div class="settings-block">
+      <div class="settings-lbl">👁 공유 비밀번호 변경 (뷰어용 PW)</div>
+      <div class="fg2">
+        <div class="frow"><label>새 비밀번호</label><input id="newVPw" type="password" placeholder="새 공유 PW"></div>
+        <div class="frow"><label>확인</label><input id="newVPwC" type="password" placeholder="다시 입력"></div>
+      </div>
+      <button onclick="changeViewerPw()" class="btn btn-green-o" style="width:100%;justify-content:center;margin-top:4px;">🔑 공유 PW 변경</button>
+    </div>
+    <div class="settings-block">
+      <div class="settings-lbl">🔥 Firebase 재설정</div>
+      <button onclick="resetFB()" class="btn" style="width:100%;justify-content:center;">Firebase 설정 변경</button>
+    </div>
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn-cancel" onclick="document.getElementById('settingsModal').classList.remove('open')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== YEARLY COMPLETED MODAL ====== -->
+<div class="modal-overlay" id="yearlyModal">
+  <div class="modal-box narrow">
+    <div class="modal-title">📆 연간 완료 목록</div>
+    <div class="frow" style="margin-bottom:16px;">
+      <select id="yearlySelect" onchange="renderYearlyComp()" style="max-width:160px;"></select>
+    </div>
+    <div id="yearlyContent"></div>
+    <div class="form-actions" style="margin-top:14px;">
+      <button class="btn-cancel" onclick="document.getElementById('yearlyModal').classList.remove('open')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =============================================================
+   태영아너스 임대관리 시스템 v1.0
+   ============================================================= */
+
+// ──────────── CONSTANTS ────────────
+const FLOORS = [2,3,4,5,6,7,8,9,10,11,12,13];
+const RPFL   = [1,2,3,4,5,6];
+const ALL_ROOMS = [];
+for (let fi=0; fi<FLOORS.length; fi++) {
+  for (let rj=0; rj<RPFL.length; rj++) {
+    ALL_ROOMS.push(String(FLOORS[fi]*100 + RPFL[rj]));
+  }
+}
+
+const ADMIN_PW_RAW = '3876';
+const VIEWER_PW_DEF = '0596';
+
+const CAT_COLOR = {
+  manual:'#00d2ff', contract_report:'#ffa502', insurance:'#9d50bb',
+  repair:'#ff6b9d', meeting:'#2ed573', payment:'#ffd32a',
+  _exp:'#ff4757', _report:'#ffa502', _ins:'#7ec8e3'
+};
+const CAT_LABEL = {
+  manual:'📝 기타', contract_report:'📋 계약신고', insurance:'🛡 보증보험',
+  repair:'🔧 수선/하자', meeting:'💬 협의/미팅', payment:'💰 납부/수납',
+  _exp:'🏠 계약만료', _report:'📋 신고기한', _ins:'🛡 보험만료'
+};
+
+// ──────────── STATE ────────────
+let appData = { rooms:{}, schedules:{}, settings:{viewerPwHash:''} };
+let authMode = null; // 'admin' | 'viewer'
+let db = null;
+let fbOK = false;
+let adminHash = '';
+let viewerHash = '';
+let authReady = false;  // 비밀번호 해싱 완료 여부
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let mcYear = calYear;
+let mcMonth = calMonth;
+let calView = 'calendar';
+let selColor = '#00d2ff';
+let editSchedId = null;
+let curRoomId = null;
+let curEvObj = null;
+let sortKey = 'room';
+let sortDir = 'asc'; // 'asc' | 'desc'
+let txSortKey = 'date';
+let txSortDir = 'desc';
+
+// ──────────── INIT ────────────
+function getLocal(k) { try { return localStorage.getItem(k); } catch(e) { return null; } }
+function setLocal(k,v) { try { localStorage.setItem(k,v); } catch(e) {} }
+function remLocal(k) { try { localStorage.removeItem(k); } catch(e) {} }
+
+function init() {
+  updateDate();
+  setInterval(updateDate, 60000);
+  
+  if(el('txMonth')) el('txMonth').value = getCurrMonthStr();
+  if(el('pnlMonth')) el('pnlMonth').value = getCurrMonthStr();
+  if(el('rentMonth')) el('rentMonth').value = getCurrMonthStr();
+
+  // ① 비밀번호 해시는 즉시 처리 (동기 함수)
+  adminHash = hashPw(ADMIN_PW_RAW);
+  viewerHash = hashPw(VIEWER_PW_DEF);
+
+  // ② 코드 기준 viewerPwHash가 로컴에 저장된 것이 있으면 우선 사용
+  const local = getLocal('ty_local');
+  if (local) {
+    try {
+      const parsed = JSON.parse(local);
+      if (parsed.settings?.viewerPwHash) viewerHash = parsed.settings.viewerPwHash;
+      appData = parsed;
+    } catch(e) {}
+  }
+
+  // ③ 인증 즉시 활성화 (데이터 로딩과 완전 분리)
+  setAuthReady();
+  
+  // 로그인 무력화 (바로 관리자 모드로 진입)
+  refreshUI();
+
+  // ④ Firebase 자동 설정 (사용자 제공 설정값)
+  let fbCfg = getLocal('ty_fb_cfg');
+  let cfg = fbCfg ? JSON.parse(fbCfg) : null;
+  // 만약 설정이 없거나, 예전에 '로컬 전용(skip)'을 눌렀다면 설정값을 강제로 덮어씌움
+  if (!cfg || cfg.skip) {
+    cfg = {
+      apiKey: "AIzaSyDt5-thtmx2xcEwi-m0qK_d76ecLww_7Qo",
+      authDomain: "taeyoung-rental.firebaseapp.com",
+      databaseURL: "https://taeyoung-rental-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "taeyoung-rental",
+      storageBucket: "taeyoung-rental.firebasestorage.app",
+      messagingSenderId: "797991090445",
+      appId: "1:797991090445:web:0332ed11cd692375dd5844"
+    };
+    setLocal('ty_fb_cfg', JSON.stringify(cfg));
+  }
+  
+  // 강제로 모달을 띄우지 않고 바로 연결
+  initFirebase(cfg);
+
+}
+
+function updateDate() {
+  const n = new Date();
+  const D = ['일','월','화','수','목','금','토'];
+  document.getElementById('dateDisplay').textContent =
+    `${n.getFullYear()}.${p2(n.getMonth()+1)}.${p2(n.getDate())} (${D[n.getDay()]})`;
+}
+function p2(n){return String(n).padStart(2,'0');}
+
+// ──────────── HASH ────────────
+function hashPw(pw) {
+  let hash = 5381;
+  for (let i = 0; i < pw.length; i++) {
+    hash = ((hash << 5) + hash) + pw.charCodeAt(i);
+  }
+  return String(hash >>> 0);
+}
+
+// ──────────── FIREBASE ────────────
+function initFirebase(cfg) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    db = firebase.database();
+    fbOK = true;
+    setSyncStatus('connecting');
+    db.ref('ty/data').on('value', snap => {
+      const val = snap.val();
+      if (val) appData = Object.assign({ rooms:{}, schedules:{}, settings:{viewerPwHash:''} }, val);
+      afterDataLoad();
+    }, () => setSyncStatus('error'));
+    db.ref('.info/connected').on('value', s => setSyncStatus(s.val() ? 'synced' : 'error'));
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    setSyncStatus('local');
+    loadLocal();
+  }
+}
+
+function setAuthReady() {
+  authReady = true;
+}
+
+async function afterDataLoad() {
+  // Firebase에서 널어온 viewerPwHash가 있으면 업데이트
+  const fbHash = appData.settings ? appData.settings.viewerPwHash : undefined;
+  if (fbHash && fbHash !== viewerHash) {
+    viewerHash = fbHash; // Firebase의 변경된 PW 리프레시
+  }
+  if (!fbHash) {
+    // 신규 DB일 경우 현재 viewerHash 저장
+    if (!appData.settings) appData.settings = {};
+    appData.settings.viewerPwHash = viewerHash;
+    await saveData();
+  }
+  migrateContractsData();
+  setSyncStatus('synced');
+  if (authMode) refreshUI();
+}
+
+async function loadLocal() {
+  const d = getLocal('ty_local');
+  if (d) {
+    try {
+      const parsed = JSON.parse(d);
+      if (parsed.settings && parsed.settings.viewerPwHash) viewerHash = parsed.settings.viewerPwHash;
+      appData = parsed;
+    } catch(e) {}
+  }
+  migrateContractsData();
+}
+
+function migrateContractsData() {
+  let changed = false;
+  if (!appData.rooms) appData.rooms = {};
+  Object.keys(appData.rooms).forEach(id => {
+    let r = appData.rooms[id];
+    if (!r.contracts) {
+      r.contracts = [];
+      changed = true;
+    }
+    if (r.current) {
+      if (!r.contracts.some(c => c.name === r.current.name && c.startDate === r.current.startDate)) {
+        r.contracts.push({ ...r.current, _type: 'current', id: Date.now().toString() + Math.random().toString(36).substr(2, 5) });
+      }
+      delete r.current;
+      changed = true;
+    }
+    if (r.previous) {
+      if (!r.contracts.some(c => c.name === r.previous.name && c.startDate === r.previous.startDate)) {
+        r.contracts.push({ ...r.previous, _type: 'previous', id: Date.now().toString() + Math.random().toString(36).substr(2, 5) });
+      }
+      delete r.previous;
+      changed = true;
+    }
+    
+    r.contracts.sort((a,b) => {
+      let d1 = a.startDate ? new Date(a.startDate) : new Date("1900-01-01");
+      let d2 = b.startDate ? new Date(b.startDate) : new Date("1900-01-01");
+      return d2 - d1;
+    });
+  });
+  if (changed) saveData();
+}
+
+function getContractsInMonth(room, yyyyMM) {
+  if (!room || !room.contracts || room.contracts.length === 0) return [];
+  const [ty, tm] = yyyyMM.split('-').map(Number);
+  const mStart = new Date(ty, tm - 1, 1);
+  const mEnd = new Date(ty, tm, 0);
+  
+  return room.contracts.filter(c => {
+    let sDate = c.startDate ? new Date(c.startDate) : new Date("2000-01-01");
+    let eDate = c.endDate ? new Date(c.endDate) : new Date("2099-12-31");
+    return (sDate <= mEnd && eDate >= mStart);
+  });
+}
+
+async function saveData() {
+  if (fbOK && db) {
+    setSyncStatus('saving');
+    try {
+      await db.ref('ty/data').set(appData);
+      setSyncStatus('synced');
+    } catch(e) {
+      setSyncStatus('error');
+      setLocal('ty_local', JSON.stringify(appData));
+    }
+  } else {
+    setLocal('ty_local', JSON.stringify(appData));
+  }
+}
+
+function setSyncStatus(s) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + s;
+  txt.textContent = {synced:'실시간 동기화',saving:'저장 중...',error:'연결 오류',local:'로컬 모드',connecting:'연결 중...'}[s] || s;
+}
+
+function saveFirebaseConfig() {
+  const cfg = {
+    apiKey: v('fb_apiKey'), authDomain: v('fb_authDomain'),
+    databaseURL: v('fb_databaseURL'), projectId: v('fb_projectId'),
+    storageBucket: v('fb_storageBucket'), messagingSenderId: v('fb_messagingSenderId'),
+    appId: v('fb_appId')
+  };
+  if (!cfg.apiKey || !cfg.databaseURL) { alert('API Key와 Database URL은 필수입니다.'); return; }
+  setLocal('ty_fb_cfg', JSON.stringify(cfg));
+  document.getElementById('fbSetupModal').classList.remove('open');
+  initFirebase(cfg);
+}
+function skipFirebase() {
+  setLocal('ty_fb_cfg', JSON.stringify({skip:true}));
+  document.getElementById('fbSetupModal').classList.remove('open');
+  setSyncStatus('local');
+}
+function resetFB() {
+  remLocal('ty_fb_cfg');
+  document.getElementById('settingsModal').classList.remove('open');
+  document.getElementById('fbSetupModal').classList.add('open');
+}
+
+// ──────────── AUTH ────────────
+function submitAuth() {
+  if (!authReady) {
+    setErr('시스템 초기화 중입니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  const inp = v('authInput');
+  if (!inp) { setErr('비밀번호를 입력하세요'); return; }
+  const h = hashPw(inp);
+  if (adminHash && h === adminHash) { authMode = 'admin'; enterApp(); }
+  else if (viewerHash && h === viewerHash) { authMode = 'viewer'; enterApp(); }
+  else {
+    setErr('비밀번호가 올바르지 않습니다');
+    shake('authInput');
+    document.getElementById('authInput').value = '';
+  }
+}
+function setErr(m) { document.getElementById('authError').textContent = m; }
+function shake(id) {
+  const el = document.getElementById(id);
+  el.classList.add('shake');
+  setTimeout(()=>el.classList.remove('shake'), 400);
+}
+function enterApp() {
+  const ov = document.getElementById('authOverlay');
+  ov.style.opacity = '0';
+  setTimeout(()=>ov.style.display='none', 500);
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('adminCtrl').style.display = authMode==='admin' ? 'flex' : 'none';
+  document.getElementById('viewerInd').style.display  = authMode==='viewer' ? 'block' : 'none';
+  refreshUI();
+}
+function logout() {
+  authMode = null;
+  document.getElementById('authInput').value = '';
+  document.getElementById('authError').textContent = '';
+  document.getElementById('mainApp').style.display = 'none';
+  const ov = document.getElementById('authOverlay');
+  ov.style.opacity = '1'; ov.style.display = 'flex';
+}
+async function changeViewerPw() {
+  const pw = v('newVPw'), pc = v('newVPwC');
+  if (!pw) { alert('새 비밀번호를 입력하세요'); return; }
+  if (pw !== pc) { alert('비밀번호가 일치하지 않습니다'); return; }
+  viewerHash = hashPw(pw);
+  appData.settings.viewerPwHash = viewerHash;
+  await saveData();
+  document.getElementById('newVPw').value = '';
+  document.getElementById('newVPwC').value = '';
+  alert('✅ 공유 비밀번호가 변경되었습니다.');
+}
+
+// ──────────── UTILS ────────────
+function v(id){ const el = document.getElementById(id); return el && el.value ? el.value.trim() : ''; }
+function el(id){ return document.getElementById(id); }
+
+function getMainMonth() {
+  const elInput = el('mainMonth');
+  if (elInput && elInput.value) return elInput.value;
+  return getCurrMonthStr();
+}
+
+function getPrimaryContract(room, monthStr = null) {
+  if (!room || !room.contracts || room.contracts.length === 0) return null;
+  const pm = monthStr || getMainMonth();
+  const arr = getContractsInMonth(room, pm);
+  if (arr.length > 0) return arr[0];
+  return room.contracts[0]; 
+}
+
+function getStatus(room, targetMonthStr = null) {
+  const c = getPrimaryContract(room, targetMonthStr);
+  if (!c || !c.name) return 'vacant';
+  if (c.renewalStatus === 'extend') return 'extend';
+  if (c.renewalStatus === 'expire') return 'expire';
+  
+  const ed = c.endDate ? new Date(c.endDate) : null;
+  if (!ed) return 'active';
+  
+  const pm = targetMonthStr || getMainMonth();
+  const [ty, tm] = pm.split('-').map(Number);
+  const targetDate = new Date(ty, tm, 0); // End of month
+  
+  const d = Math.floor((ed - targetDate) / 86400000);
+  if (d < 0) return 'expired';
+  if (d <= 90) return 'check';
+  return 'active';
+}
+
+function dayDiff(dateStr) {
+  if (!dateStr) return null;
+  let dStr = dateStr.replace(/\./g, '-').replace(/\//g, '-').trim();
+  let parts = dStr.split('-');
+  if (parts.length !== 3) return null;
+  let y = parseInt(parts[0], 10);
+  if (y < 100) y += 2000;
+  let d = new Date(y, parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.floor((d - today) / 86400000);
+}
+
+function formatMoney(str) {
+  if (!str) return '0';
+  const num = parseInt(String(str).replace(/[^0-9-]/g, ''), 10);
+  if (isNaN(num)) return str;
+  return num.toLocaleString();
+}
+
+function getCurrMonthStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function shiftMonth(inputId, delta) {
+  const elInput = el(inputId);
+  if(!elInput || !elInput.value) return;
+  const [y, m] = elInput.value.split('-').map(Number);
+  let d = new Date(y, m - 1 + delta, 1);
+  elInput.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  
+  if(inputId === 'rentMonth') renderRentGrid();
+  else if(inputId === 'txMonth') renderTxGrid();
+  else if(inputId === 'pnlMonth') renderPnl();
+  else if(inputId === 'mainMonth') refreshUI();
+}
+
+function toggleRentPaid(id, contractId, e) {
+  e.stopPropagation();
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  
+  const pm = el('rentMonth') ? el('rentMonth').value : getCurrMonthStr();
+  const txs = appData.transactions || [];
+  const isTxPaid = txs.some(t => t.date.startsWith(pm) && t.matchedRoom === String(id) && (t.category === 'inc_rent' || t.category === 'inc_dep_rent'));
+  
+  if(isTxPaid) {
+    alert('통장 엑셀 내역으로 자동 확인된 납부 건은 체크를 해제할 수 없습니다.\n거래내역 탭에서 해당 내역을 삭제하시거나 매칭 호실을 변경해주세요.');
+    e.target.checked = true; // revert
+    return;
+  }
+  
+  const room = appData.rooms[id];
+  if(!room || !room.contracts) return;
+  const target = room.contracts.find(c => c.id === contractId);
+  if(!target || !target.name) return;
+  if(!target.paidMonths) target.paidMonths = {};
+  
+  target.paidMonths[pm] = e.target.checked;
+  saveData().then(() => { renderRentGrid(); });
+}
+
+function fmtDate(s) {
+  if (!s) return '-';
+  return s.replace(/-/g,'.');
+}
+
+function maskSSN(s) {
+  if (!s) return '-';
+  const p = s.split('-');
+  if (p.length === 2) return p[0] + '-*******';
+  return s.substring(0,6) + '-*******';
+}
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2,5);
+}
+
+function hex2rgba(hex, a) {
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ──────────── SORT ────────────
+function setSort(key) {
+  if (sortKey === key) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortKey = key;
+    sortDir = 'asc';
+  }
+  refreshUI(); // 정렬 변경 시 전체 UI 리프레시 (렌트 탭도 반영)
+}
+
+function getSortArrow(k) {
+  if (sortKey !== k) return '<span style="font-size:0.7rem;opacity:0.2;">▼▲</span>';
+  return sortDir === 'asc' ? '<span style="font-size:0.7rem;color:var(--gold);">▲</span>' : '<span style="font-size:0.7rem;color:var(--gold);">▼</span>';
+}
+
+const STATUS_ORDER = { active:1, check:2, extend:3, expire:4, vacant:5 };
+
+function getSortedRooms() {
+  const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+  return ALL_ROOMS.slice().sort((a, b) => {
+    const ra = appData.rooms[a] || {};
+    const rb = appData.rooms[b] || {};
+    const ca = getPrimaryContract(ra, targetMonthStr) || {};
+    const cb = getPrimaryContract(rb, targetMonthStr) || {};
+    let cmp = 0;
+    switch(sortKey) {
+      case 'room':
+        cmp = a.localeCompare(b, undefined, {numeric: true});
+        break;
+      case 'status':
+        cmp = (STATUS_ORDER[getStatus(ra, targetMonthStr)]||9) - (STATUS_ORDER[getStatus(rb, targetMonthStr)]||9);
+        break;
+      case 'name': {
+        const na = ca.name || 'zzz', nb = cb.name || 'zzz';
+        cmp = na.localeCompare(nb, 'ko');
+        break;
+      }
+      case 'sdate': {
+        const sa = ca.startDate || '9999-12-31', sb = cb.startDate || '9999-12-31';
+        cmp = sa.localeCompare(sb);
+        break;
+      }
+      case 'edate': {
+        const ea = ca.endDate || '9999-12-31', eb = cb.endDate || '9999-12-31';
+        cmp = ea.localeCompare(eb);
+        break;
+      }
+      case 'dday': {
+        const da = ca.endDate ? dayDiff(ca.endDate) : 9999;
+        const db2 = cb.endDate ? dayDiff(cb.endDate) : 9999;
+        cmp = da - db2;
+        break;
+      }
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+}
+
+// ──────────── REFRESH UI ────────────
+function refreshUI() {
+  renderRoomGrid();
+  renderRentGrid();
+  renderTxGrid();
+  renderPnl();
+  updateStats();
+  renderAlertBanner();
+  renderCalendar();
+  renderMiniCal();
+  renderUpcoming();
+  renderCompleted();
+}
+
+// ──────────── STATS ────────────
+function updateStats() {
+  const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+  let active=0, check=0, extend=0, expire=0, vacant=0;
+  let repMissing=0, repUrgent=0;
+  
+  ALL_ROOMS.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const s = getStatus(room, targetMonthStr);
+    if (s==='active') active++;
+    else if (s==='check') check++;
+    else if (s==='extend') extend++;
+    else if (s==='expire') expire++;
+    else vacant++;
+
+    const c = getPrimaryContract(room, targetMonthStr) || {};
+    if (c && c.name) {
+      if (c.contractDate && !c.reportDone) {
+        repMissing++;
+        const dl = new Date(c.contractDate); dl.setDate(dl.getDate()+90);
+        const rd = Math.floor((dl-new Date())/86400000);
+        if (rd >= 0 && rd <= 30) repUrgent++;
+      }
+    }
+  });
+  el('statActive').textContent = active + extend;
+  el('statCheck').textContent  = check;
+  el('statReport').innerHTML = repMissing + ` <span style="font-size:0.75rem;color:var(--dim);">(임박 <span style="color:var(--red);">${repUrgent}</span>)</span>`;
+  el('statVacant').textContent = vacant + (expire > 0 ? ` (만기 ${expire})` : '');
+}
+
+// ──────────── ALERT BANNER ────────────
+function renderAlertBanner() {
+  const chips = [];
+  const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+  ALL_ROOMS.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const c = getPrimaryContract(room, targetMonthStr);
+    if (!c || !c.name) return;
+    const ed = c.endDate ? dayDiff(c.endDate) : null;
+    const rs = c.renewalStatus;
+    if (ed !== null && ed >= 0 && ed <= 90) {
+      const suffix = rs==='extend'?' (연장확정)' : rs==='expire'?' (만기종료)' : '';
+      chips.push({cls:'chip-ce', txt:`${id}호 계약만료 D-${ed}${suffix}`, rid:id});
+    }
+    if (c.contractDate && !c.reportDone) {
+      const dl = new Date(c.contractDate); dl.setDate(dl.getDate()+90);
+      const rd = Math.floor((dl-new Date())/86400000);
+      if (rd >= 0 && rd <= 90) chips.push({cls:'chip-re', txt:`${id}호 계약신고기한 D-${rd}`, rid:id});
+    }
+    const ins = room.insurance;
+    if (ins && ins.expiryDate) {
+      const id2 = dayDiff(ins.expiryDate);
+      if (id2 !== null && id2 >= 0 && id2 <= 90) chips.push({cls:'chip-ie', txt:`${id}호 보험만료 D-${id2}`, rid:id});
+    }
+  });
+
+  const banner = el('alertBanner'), items = el('alertItems');
+  if (!chips.length) { banner.classList.remove('has-alerts'); return; }
+  banner.classList.add('has-alerts');
+  items.innerHTML = chips.map(c =>
+    `<div class="alert-chip ${c.cls}" onclick="openContractModal('${c.rid}')">${c.txt}</div>`
+  ).join('');
+}
+
+// ──────────── ROOM TABLE (List View) ────────────
+function renderRoomGrid() {
+  const grid = el('roomGrid');
+  grid.innerHTML = '';
+  const badgeMap  = { active:'rt-active', check:'rt-check', extend:'rt-extend', expire:'rt-expire', vacant:'rt-vacant' };
+  const labelMap  = { active:'계약중', check:'재계약확인', extend:'연장확정', expire:'만기종료', vacant:'공실' };
+
+  const sorted = getSortedRooms();
+  
+  let totalDep = 0, totalMon = 0, totalMnt = 0;
+  
+  let html = `<div class="room-table-wrap"><table class="room-table">
+    <thead>
+      <tr>
+        <th onclick="setSort('room')" style="cursor:pointer;" title="클릭하여 정렬">호실 ${getSortArrow('room')}</th>
+        <th onclick="setSort('status')" style="cursor:pointer;" title="클릭하여 정렬">상태 ${getSortArrow('status')}</th>
+        <th onclick="setSort('name')" style="cursor:pointer;" title="클릭하여 정렬">임차인 ${getSortArrow('name')}</th>
+        <th class="td-right">보증금</th>
+        <th class="td-right">월세</th>
+        <th class="td-right">관리비</th>
+        <th onclick="setSort('sdate')" style="cursor:pointer;" title="클릭하여 정렬">계약 시작일 ${getSortArrow('sdate')}</th>
+        <th onclick="setSort('edate')" style="cursor:pointer;" title="클릭하여 정렬">계약 만기일 ${getSortArrow('edate')}</th>
+        <th class="td-center">계약신고</th>
+        <th>비고</th>
+      </tr>
+    </thead>
+    <tbody>`;
+  
+  const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+  
+  sorted.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const c = getPrimaryContract(room, targetMonthStr) || {};
+    const s = getStatus(room, targetMonthStr);
+    const nm = c.name || '-';
+    const bcls = badgeMap[s];
+    const blbl = labelMap[s];
+    
+    const dNum = parseInt(String(c.deposit||'0').replace(/[^0-9-]/g, ''), 10) || 0;
+    const mNum = parseInt(String(c.monthly||'0').replace(/[^0-9-]/g, ''), 10) || 0;
+    const mntNum = parseInt(String(c.maint||'0').replace(/[^0-9-]/g, ''), 10) || 0;
+    
+    if (s !== 'vacant') {
+      totalDep += dNum;
+      totalMon += mNum;
+      totalMnt += mntNum;
+    }
+    
+    const dep = c.deposit ? formatMoney(c.deposit) : '-';
+    const mon = c.monthly ? formatMoney(c.monthly) : '-';
+    const mnt = c.maint ? formatMoney(c.maint) : '-';
+    
+    const dStart = c.startDate ? fmtDate(c.startDate) : '-';
+    const dEnd = c.endDate ? fmtDate(c.endDate) : '-';
+    const dates = `${dStart} ~ ${dEnd}`;
+    
+    const memo = c.memo ? `<span data-tip="${c.memo.replace(/"/g, '&quot;')}">📝</span>` : '';
+    
+    // Report
+    let repHtml = '-';
+    if (s !== 'vacant' && c.contractDate) {
+      if (c.reportDone) repHtml = `<span style="color:var(--green);font-weight:700;">완료</span>`;
+      else repHtml = `<span style="color:var(--red);font-weight:700;">미신고</span>`;
+    }
+    
+    html += `<tr onclick="openContractModal('${id}')">
+      <td style="font-weight:800;color:var(--text);">${id}</td>
+      <td><span class="rt-badge ${bcls}">${blbl}</span></td>
+      <td style="font-weight:700;">${nm}</td>
+      <td class="td-right">${dep}</td>
+      <td class="td-right">${mon}</td>
+      <td class="td-right">${mnt}</td>
+      <td style="white-space:nowrap; font-weight:600; color:var(--text);">${dStart}</td>
+      <td style="white-space:nowrap; font-weight:600; color:var(--text);">${dEnd}</td>
+      <td class="td-center">${repHtml}</td>
+      <td class="td-center">${memo}</td>
+    </tr>`;
+  });
+  
+  html += `</tbody>
+    <tfoot>
+      <tr style="background:rgba(255,255,255,0.08); font-weight:800; border-top:2px solid var(--border);">
+        <td colspan="3" class="td-right">합계 :</td>
+        <td class="td-right" style="color:var(--gold);">${formatMoney(totalDep)}</td>
+        <td class="td-right" style="color:var(--gold);">${formatMoney(totalMon)}</td>
+        <td class="td-right" style="color:var(--gold);">${formatMoney(totalMnt)}</td>
+        <td colspan="4"></td>
+      </tr>
+    </tfoot>
+  </table></div>`;
+  grid.innerHTML = html;
+}
+
+function updateRentPastUnpaid(id, val, contractId) {
+  const room = appData.rooms[id];
+  if (!room || !room.contracts) return;
+  const target = room.contracts.find(c => c.id === contractId);
+  if (!target) return;
+  target.pastUnpaid = val;
+  saveData().then(() => { refreshUI(); });
+}
+
+function calcProratedRent(totalReq, startDate, endDate, targetMonthStr) {
+  if (!totalReq) return 0;
+  const [ty, tm] = targetMonthStr.split('-').map(Number);
+  let mStart = new Date(ty, tm - 1, 1);
+  let mEnd = new Date(ty, tm, 0); 
+  let sDate = startDate ? new Date(startDate) : new Date("2000-01-01");
+  let eDate = endDate ? new Date(endDate) : new Date("2099-12-31");
+  
+  if (eDate < mStart || sDate > mEnd) return 0;
+  if (sDate <= mStart && eDate >= mEnd) return totalReq;
+  
+  let days = 30;
+  if (sDate > mStart && sDate <= mEnd) {
+    days = 30 - sDate.getDate() + 1;
+  }
+  if (eDate >= mStart && eDate < mEnd) {
+    if (sDate > mStart && sDate <= mEnd) days = eDate.getDate() - sDate.getDate() + 1;
+    else days = eDate.getDate();
+  }
+  days = Math.max(0, Math.min(30, days));
+  if (days === 30) return totalReq;
+  return Math.floor((totalReq / 30) * days);
+}
+
+function renderRentGrid() {
+  const tbd = el('rentGridBody');
+  if (!tbd) return;
+  tbd.innerHTML = '';
+  
+  const sorted = getSortedRooms();
+  const pm = el('rentMonth') ? el('rentMonth').value : getCurrMonthStr();
+  if (!pm) return;
+  
+  let totalIncome = 0;
+  let totalUnpaid = 0;
+  
+  el('rentIncomeMonth').textContent = pm.split('-')[1] + '월 납부 완료액';
+  const txs = appData.transactions || [];
+  
+  sorted.forEach(id => {
+    const room = appData.rooms[id] || {};
+    
+    const contractsInMonth = getContractsInMonth(room, pm);
+    contractsInMonth.forEach((c, idx) => {
+      if (!c || !c.name) return; 
+      
+      const monNum = parseInt(String(c.monthly).replace(/[^0-9-]/g, ''), 10) || 0;
+      const mntNum = parseInt(String(c.maint).replace(/[^0-9-]/g, ''), 10) || 0;
+      let totalReq = monNum + mntNum;
+      
+      const prorated = calcProratedRent(totalReq, c.startDate, c.endDate, pm);
+      
+      const [ty, tm] = pm.split('-').map(Number);
+      const mEnd = new Date(ty, tm, 0); 
+      const sDate = c.startDate ? new Date(c.startDate) : new Date("2000-01-01");
+      const isFuture = sDate > mEnd;
+      
+      totalReq = prorated;
+      
+      let nmDisp = c.name;
+      // If it's not the first one overlapping this month, maybe they moved out earlier in the month
+      const isPrev = idx > 0;
+      if (isPrev) nmDisp += ' <span style="color:var(--orange);font-size:0.75rem;">(이전)</span>';
+      if (!isPrev && isFuture) nmDisp += ' <span style="color:#2ed573;font-size:0.75rem;font-weight:800;border:1px solid #2ed573;border-radius:4px;padding:1px 4px;margin-left:4px;">NEW</span>';
+      
+      const nm = nmDisp;
+      const depStr = c.deposit ? formatMoney(c.deposit) : '-';
+      
+      // Match by month AND room AND tx dates
+      // Let's ensure the TX matches this specific tenant. We match by Room, assuming only one tenant pays rent.
+      // If multiple tenants overlap, this might incorrectly flag both as paid if one pays, but that's a known limitation.
+      const txPaid = txs.some(t => {
+         // Fix the startsWith bug by matching YYYY-M or YYYY-MM
+         const txParts = t.date.split('-');
+         if (txParts.length < 2) return false;
+         const txY = txParts[0];
+         const txM = txParts[1].padStart(2, '0');
+         const normTxDate = `${txY}-${txM}`;
+         return normTxDate === pm && t.matchedRoom === String(id) && (t.category === 'inc_rent' || t.category === 'inc_dep_rent');
+      });
+      const manualPaid = c.paidMonths && c.paidMonths[pm];
+      const isPaid = txPaid || manualPaid;
+      
+      const pastUnpaidStr = c.pastUnpaid || '';
+      const pastUnpaidNum = parseInt(String(c.pastUnpaid).replace(/[^0-9-]/g, ''), 10) || 0;
+      
+      if (isPaid) {
+        totalIncome += totalReq;
+      } else {
+        totalUnpaid += totalReq;
+      }
+      totalUnpaid += pastUnpaidNum;
+      
+      const memo = c.memo ? `<span data-tip="${c.memo.replace(/"/g, '&quot;')}">📝</span>` : '';
+      const dispReq = (prorated !== (monNum+mntNum)) ? `<span style="color:var(--gold);">${formatMoney(prorated)}</span> <span style="font-size:0.7rem;color:var(--dim);">(일할정산)</span>` : `<span style="color:var(--gold);">${formatMoney(totalReq)}</span>`;
+      
+      tbd.innerHTML += `<tr onclick="openContractModal('${id}')" style="${isPrev ? 'background:rgba(255,255,255,0.02);' : ''}">
+        <td style="font-weight:800; opacity:${isPrev?0.5:1};">${id}</td>
+        <td style="font-weight:700;">${nm}</td>
+        <td class="td-right">${depStr}</td>
+        <td class="td-right" style="font-weight:700;">${dispReq}</td>
+        <td class="td-center" onclick="event.stopPropagation();"><input type="text" value="${pastUnpaidStr}" placeholder="기존 미납액" style="width:110px; padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:white; text-align:right;" onchange="updateRentPastUnpaid('${id}', this.value, '${c.id}')"></td>
+        <td class="td-center" onclick="event.stopPropagation();"><input type="checkbox" class="rent-chk" ${isPaid ? 'checked' : ''} onchange="toggleRentPaid('${id}', '${c.id}', event)"></td>
+        <td class="td-center">${memo}</td>
+      </tr>`;
+    });
+  });
+  
+  el('rentIncome').innerHTML = totalIncome.toLocaleString() + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  el('rentUnpaid').innerHTML = totalUnpaid.toLocaleString() + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+}
+
+// ──────────── EXPORT EXCEL ────────────
+function applyExcelStyle(ws) {
+  if(!ws['!ref']) return;
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let C = range.s.c; C <= range.e.c; ++C) {
+    for(let R = range.s.r; R <= range.e.r; ++R) {
+      const cell = ws[XLSX.utils.encode_cell({c:C, r:R})];
+      if(!cell) continue;
+      if(!cell.s) cell.s = {};
+      cell.s.font = { name: "맑은 고딕", sz: 11 };
+      cell.s.alignment = { vertical: "center", horizontal: "center" };
+      cell.s.border = { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} };
+      if(R === 0) {
+        cell.s.fill = { fgColor: { rgb: "E2EFDA" } };
+        cell.s.font.bold = true;
+      }
+    }
+  }
+}
+
+function exportRentExcel() {
+  const pm = el('rentMonth') ? el('rentMonth').value : getCurrMonthStr();
+  const rows = [['호실', '이름', '보증금', '청구월세(일할정산)', '기존미납액', '당월납부여부', '특이사항']];
+  const txs = appData.transactions || [];
+  getSortedRooms().forEach(id => {
+    const r = appData.rooms[id] || {};
+    const contractsInMonth = getContractsInMonth(r, pm);
+    contractsInMonth.forEach((c, idx) => {
+      if (!c || !c.name) return;
+      
+      const monNum = parseInt(String(c.monthly).replace(/[^0-9-]/g, ''), 10) || 0;
+      const mntNum = parseInt(String(c.maint).replace(/[^0-9-]/g, ''), 10) || 0;
+      let totalReq = monNum + mntNum;
+      const prorated = calcProratedRent(totalReq, c.startDate, c.endDate, pm);
+      
+      const [ty, tm] = pm.split('-').map(Number);
+      const mEnd = new Date(ty, tm, 0); 
+      const isFuture = (c.startDate ? new Date(c.startDate) : new Date("2000-01-01")) > mEnd;
+      const isPrev = idx > 0;
+      
+      const txPaid = txs.some(t => {
+         const txParts = t.date.split('-');
+         if (txParts.length < 2) return false;
+         const normTxDate = `${txParts[0]}-${txParts[1].padStart(2, '0')}`;
+         return normTxDate === pm && t.matchedRoom === String(id) && (t.category === 'inc_rent' || t.category === 'inc_dep_rent');
+      });
+      const isPaid = txPaid || (c.paidMonths && c.paidMonths[pm]);
+      
+      rows.push([
+        id + (isPrev ? ' (이전)' : ''), 
+        c.name + (isFuture ? ' (NEW)' : ''),
+        c.deposit||'0', 
+        prorated, 
+        c.pastUnpaid||'0', 
+        isPaid ? 'O' : 'X', 
+        c.memo||''
+      ]);
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applyExcelStyle(ws);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "월세납부현황");
+  XLSX.writeFile(wb, `월세납부현황_${pm}.xlsx`);
+}
+
+function exportTxExcel() {
+  const pm = el('txMonth') ? el('txMonth').value : getCurrMonthStr();
+  const rows = [['날짜', '거래내용(적요)', '매칭호실', '수입', '지출', '계정(분류)']];
+  const txs = (appData.transactions||[]).filter(t => {
+     const txParts = t.date.split('-');
+     if (txParts.length < 2) return false;
+     const normDate = `${txParts[0]}-${txParts[1].padStart(2, '0')}`;
+     return normDate === pm;
+  });
+  txs.forEach(t => {
+    rows.push([t.date, t.desc||'', t.matchedRoom||'', t.income||'', t.expense||'', getCatLabel(t.category)]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  applyExcelStyle(ws);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "거래내역");
+  XLSX.writeFile(wb, `거래내역_${pm}.xlsx`);
+}
+
+function exportPnlExcel() {
+  const pm = el('pnlMonth') ? el('pnlMonth').value : getCurrMonthStr();
+  const txs = (appData.transactions||[]).filter(t => {
+     const txParts = t.date.split('-');
+     if (txParts.length < 2) return false;
+     const normDate = `${txParts[0]}-${txParts[1].padStart(2, '0')}`;
+     return normDate === pm && t.category !== 'transfer_in' && t.category !== 'transfer_out';
+  });
+  
+  const rows1 = [['날짜', '호실', '수입/지출내역', '수입금액', '지출금액', '비고(계정)']];
+  txs.forEach(t => {
+    if(t.category.startsWith('inc_') && t.category !== 'inc_deposit' && t.category !== 'inc_dep_rent') {
+      rows1.push([t.date, t.matchedRoom||'', t.desc||'', t.income||'', '', getCatLabel(t.category)]);
+    } else if(t.category.startsWith('exp_') && t.category !== 'exp_deposit') {
+      rows1.push([t.date, t.matchedRoom||'', t.desc||'', '', t.expense||'', getCatLabel(t.category)]);
+    }
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(rows1);
+  applyExcelStyle(ws1);
+  
+  const rows2 = [['날짜', '호실', '보증금 변동내역', '입금(증가)', '반환(감소)']];
+  txs.forEach(t => {
+    if(t.category === 'inc_deposit') {
+      rows2.push([t.date, t.matchedRoom||'', t.desc||'', t.income||'', '']);
+    } else if(t.category === 'inc_dep_rent') {
+      let rAmt = 0;
+      if(appData.rooms[t.matchedRoom] && appData.rooms[t.matchedRoom].current) {
+        const c = appData.rooms[t.matchedRoom].current;
+        rAmt = parseInt(String(c.monthly).replace(/[^0-9]/g,'')||'0') + parseInt(String(c.maint).replace(/[^0-9]/g,'')||'0');
+      }
+      const incNum = parseInt(String(t.income).replace(/[^0-9]/g,'')||'0');
+      const depAmt = (incNum > rAmt) ? incNum - rAmt : incNum;
+      rows2.push([t.date, t.matchedRoom||'', t.desc||'(합산건 보증금)', depAmt, '']);
+    } else if(t.category === 'exp_deposit') {
+      rows2.push([t.date, t.matchedRoom||'', t.desc||'', '', t.expense||'']);
+    }
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(rows2);
+  applyExcelStyle(ws2);
+  
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws1, "수입지출내역");
+  XLSX.utils.book_append_sheet(wb, ws2, "보증금증감내역");
+  XLSX.writeFile(wb, `수지분석_${pm}.xlsx`);
+}
+
+function getCatLabel(c) {
+  const f = txCategories.find(x => x.val === c);
+  return f ? f.label : c;
+}
+function exportExcelData() {
+  const rows = [];
+  rows.push(['호실', '상태', '임차인', '주민번호', '연락처', '보증금', '월세', '관리비', '계약시작일', '만기일', '계약신고', '보증보험만기', '비고', '당월납부여부', '기존미납액']);
+  
+  const pm = el('rentMonth') ? el('rentMonth').value : getCurrMonthStr();
+  const txs = appData.transactions || [];
+  
+  getSortedRooms().forEach(id => {
+    const r = appData.rooms[id] || {};
+    const c = r.current || {};
+    const s = getStatus(r);
+    
+    const txPaid = txs.some(t => t.date.startsWith(pm) && t.matchedRoom === String(id) && t.category === 'inc_rent');
+    const manualPaid = c.paidMonths && c.paidMonths[pm];
+    const isPaid = txPaid || manualPaid;
+    
+    rows.push([
+      id, s, c.name||'', c.ssn||'', c.phone||'',
+      c.deposit||'', c.monthly||'', c.maint||'',
+      c.startDate||'', c.endDate||'',
+      c.reportDone ? 'O' : 'X',
+      (r.insurance && r.insurance.expiryDate) ? r.insurance.expiryDate : '',
+      c.memo||'',
+      isPaid ? 'O' : 'X',
+      c.pastUnpaid||''
+    ]);
+  });
+  
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "계약현황");
+  XLSX.writeFile(wb, `태영아너스_계약현황_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+window.onclick = function(event) {
+  if (!event.target.matches('.dropbtn')) {
+    var dropdowns = document.getElementsByClassName("dropdown-content");
+    for (var i = 0; i < dropdowns.length; i++) {
+      var openDropdown = dropdowns[i];
+      if (openDropdown.parentElement.classList.contains('show')) {
+        openDropdown.parentElement.classList.remove('show');
+      }
+    }
+  }
+}
+function toggleDropdown() {
+  document.getElementById("adminDropdown").classList.toggle("show");
+}
+
+// ──────────── CONTRACT MODAL ────────────
+let curContractId = null;
+
+function openContractModal(roomId) {
+  curRoomId = roomId;
+  const room = appData.rooms[roomId] || {};
+  if (!room.contracts) room.contracts = [];
+  const ins = room.insurance || {};
+  const isAdmin = authMode === 'admin';
+
+  el('cmTitle').textContent = `🏠 ${roomId}호`;
+
+  const sel = el('contractSelector');
+  if (sel) {
+    sel.innerHTML = room.contracts.map(c => `<option value="${c.id}">${c.startDate||'미지정'}~${c.endDate||'미지정'} ${c.name}</option>`).join('');
+    const pm = el('mainMonth') ? el('mainMonth').value : getCurrMonthStr();
+    const primary = getPrimaryContract(room, pm);
+    if (primary) sel.value = primary.id;
+    else sel.value = room.contracts.length > 0 ? room.contracts[0].id : '';
+  }
+  
+  const prevTab = el('cTabPrev');
+  if(prevTab) prevTab.style.display = 'none';
+
+  loadContractForm(sel ? sel.value : null);
+
+  el('if_exp').value = ins.expiryDate || '';
+  el('if_co').value = ins.company || '';
+  el('if_no').value = ins.policyNo || '';
+  el('if_amt').value = ins.amount || '';
+  el('if_memo').value = ins.memo || '';
+
+  const rdonly = !isAdmin;
+  ['cf_name','cf_phone','cf_ssn','cf_deposit','cf_monthly','cf_maint',
+   'cf_cdate','cf_sdate','cf_edate','cf_rdate','cf_memo',
+   'if_exp','if_co','if_no','if_amt','if_memo'
+  ].forEach(id => { el(id).readOnly = rdonly; });
+  el('cf_reportDone').disabled = rdonly;
+  el('cf_renewal').disabled = rdonly;
+
+  el('cfSsnRow').style.display = isAdmin ? 'block' : 'none';
+  el('cfFinSec').style.display = isAdmin ? 'block' : 'none';
+  el('cfFinRow').style.display = isAdmin ? 'grid' : 'none';
+  el('cmSaveBtn').style.display = isAdmin ? 'block' : 'none';
+
+  cTab('curr');
+  el('contractModal').classList.add('open');
+}
+
+function loadContractForm(cid) {
+  curContractId = cid;
+  const room = appData.rooms[curRoomId] || {};
+  const c = room.contracts ? room.contracts.find(x => x.id === cid) : null;
+  const target = c || {};
+  
+  const isAdmin = authMode === 'admin';
+  el('cf_name').value = target.name || '';
+  el('cf_phone').value = target.phone || '';
+  el('cf_ssn').value = isAdmin ? (target.ssn || '') : (target.ssn ? maskSSN(target.ssn) : '');
+  el('cf_deposit').value = target.deposit || '';
+  el('cf_monthly').value = target.monthly || '';
+  el('cf_maint').value = target.maint || '';
+  el('cf_cdate').value = target.contractDate || '';
+  el('cf_sdate').value = target.startDate || '';
+  el('cf_edate').value = target.endDate || '';
+  el('cf_reportDone').checked = target.reportDone || false;
+  el('cf_rdate').value = target.reportDate || '';
+  el('cf_renewal').value = target.renewalStatus || '';
+  el('cf_memo').value = target.memo || '';
+  updateReportDeadline();
+}
+
+function addNewContract() {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const room = appData.rooms[curRoomId];
+  if (!room) return;
+  if (!room.contracts) room.contracts = [];
+  const newC = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+    name: '새 임차인',
+    startDate: getCurrMonthStr() + '-01'
+  };
+  room.contracts.push(newC);
+  room.contracts.sort((a,b) => (new Date(b.startDate||"1900-01-01")) - (new Date(a.startDate||"1900-01-01")));
+  
+  const sel = el('contractSelector');
+  if (sel) {
+    sel.innerHTML = room.contracts.map(c => `<option value="${c.id}">${c.startDate||'미지정'}~${c.endDate||'미지정'} ${c.name}</option>`).join('');
+    sel.value = newC.id;
+  }
+  loadContractForm(newC.id);
+}
+
+function delContract() {
+  if (authMode !== 'admin') return;
+  if (!confirm('이 계약 이력을 삭제하시겠습니까? (연결된 납부 내역은 별도 삭제 필요)')) return;
+  const room = appData.rooms[curRoomId];
+  if (!room || !room.contracts) return;
+  room.contracts = room.contracts.filter(c => c.id !== curContractId);
+  saveData().then(() => {
+    openContractModal(curRoomId);
+    refreshUI();
+  });
+}
+
+function updateReportDeadline() {
+  const cdEl = el('cf_cdate');
+  const cd = cdEl ? cdEl.value : null;
+  const hint = el('reportDeadlineHint');
+  if (!cd) { hint.textContent = ''; return; }
+  const dl = new Date(cd); dl.setDate(dl.getDate()+90);
+  const d = dayDiff(dl.toISOString().split('T')[0]);
+  const past = d !== null && d < 0;
+  hint.innerHTML = `신고기한: <b style="color:${past?'var(--red)':d<=30?'var(--yellow)':'var(--green)'}">${fmtDate(dl.toISOString().split('T')[0])} (${past?'기한 초과!':'D-'+d})</b>`;
+}
+
+function cTab(tab) {
+  ['curr','prev','ins'].forEach(t => {
+    const elF = el(`cForm${t.charAt(0).toUpperCase()+t.slice(1)}`);
+    if(elF) elF.style.display = t===tab ? 'block' : 'none';
+    const elT = el(`cTab${t.charAt(0).toUpperCase()+t.slice(1)}`);
+    if(elT) elT.classList.toggle('active', t===tab);
+  });
+}
+
+async function saveContract() {
+  if (authMode !== 'admin') return;
+  if (!appData.rooms[curRoomId]) appData.rooms[curRoomId] = { contracts: [] };
+  const room = appData.rooms[curRoomId];
+  if (!room.contracts) room.contracts = [];
+  
+  let target = room.contracts.find(x => x.id === curContractId);
+  if (!target) {
+    target = { id: curContractId || (Date.now().toString() + Math.random().toString(36).substr(2, 5)) };
+    room.contracts.push(target);
+  }
+
+  target.name = v('cf_name'); target.phone = v('cf_phone'); target.ssn = v('cf_ssn');
+  target.deposit = v('cf_deposit'); target.monthly = v('cf_monthly'); target.maint = v('cf_maint');
+  target.contractDate = v('cf_cdate'); target.startDate = v('cf_sdate'); target.endDate = v('cf_edate');
+  target.reportDone = el('cf_reportDone').checked; target.reportDate = v('cf_rdate');
+  target.renewalStatus = v('cf_renewal'); target.memo = v('cf_memo');
+
+  room.insurance = {
+    expiryDate: v('if_exp'), company: v('if_co'),
+    policyNo: v('if_no'), amount: v('if_amt'), memo: v('if_memo')
+  };
+  
+  room.contracts.sort((a,b) => (new Date(b.startDate||"1900-01-01")) - (new Date(a.startDate||"1900-01-01")));
+
+  await saveData();
+  closeContractModal();
+  refreshUI();
+}
+
+function closeContractModal() {
+  el('contractModal').classList.remove('open');
+  curRoomId = null;
+}
+
+// ──────────── EXCEL EXPORTS ────────────
+function toggleExportMenu() { el('exportMenu').classList.toggle('open'); }
+document.addEventListener('click', e => {
+  if (!e.target.closest('#exportWrap')) {
+    const em = el('exportMenu');
+    if (em) em.classList.remove('open');
+  }
+});
+
+function exportStatusExcel() {
+  el('exportMenu').classList.remove('open');
+  const statusLabel = { active:'계약중', check:'재계약 확인 필요', extend:'연장 확정', expire:'만기종료', vacant:'공실' };
+  const hdrs = ['호실','성명','주민등록번호','전화번호','보증금(만원)','월세(만원)','관리비(만원)','계약시작일','계약만료일','재계약 상태','신고완료','메모'];
+  const rows = [hdrs];
+
+  ALL_ROOMS.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const c = room.current || {};
+    const st = getStatus(room);
+    rows.push([
+      id+'호', c.name||'공실', c.ssn||'', c.phone||'',
+      c.deposit ? +c.deposit : '', c.monthly ? +c.monthly : '', c.maint ? +c.maint : '',
+      c.startDate||'', c.endDate||'',
+      statusLabel[st], c.reportDone ? '완료':'미완료', c.memo||''
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [8,12,16,14,10,8,8,12,12,12,8,20].map(w=>({wch:w}));
+  // Header styling
+  const hstyle = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'7B5C00'}},alignment:{horizontal:'center'}};
+  for (let c=0; c<hdrs.length; c++) {
+    const ref = XLSX.utils.encode_cell({r:0,c});
+    if (ws[ref]) ws[ref].s = hstyle;
+  }
+  XLSX.utils.book_append_sheet(wb, ws, '계약현황');
+  XLSX.writeFile(wb, `태영아너스_계약현황_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+function openTaxModal() {
+  el('exportMenu').classList.remove('open');
+  const sel = el('taxYear'); sel.innerHTML = '';
+  const cy = new Date().getFullYear();
+  for (let y=cy-1; y>=cy-6; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y+'년'; if (y===cy-1) o.selected=true;
+    sel.appendChild(o);
+  }
+  el('taxModal').classList.add('open');
+}
+function closeTaxModal() { el('taxModal').classList.remove('open'); }
+
+function exportTaxExcel() {
+  const ty = parseInt(v('taxYear'));
+  el('taxModal').classList.remove('open');
+  const yS = new Date(`${ty}-01-01`);
+  const yE = new Date(`${ty}-12-31`);
+
+  const hdrs = ['호실','성명','주민등록번호','보증금(만원)','월세(만원)','관리비(만원)','계약시작일(연도내)','계약만료일(연도내)','계약구분','비고'];
+  const allRows = [hdrs];
+
+  function overlaps(sDate, eDate) {
+    if (!sDate || !eDate) return false;
+    return new Date(sDate) <= yE && new Date(eDate) >= yS;
+  }
+  function clip(sDate, eDate) {
+    const s = new Date(Math.max(new Date(sDate), yS));
+    const e = new Date(Math.min(new Date(eDate), yE));
+    return [s.toISOString().split('T')[0], e.toISOString().split('T')[0]];
+  }
+
+  ALL_ROOMS.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const contracts = [];
+
+    const c = room.current;
+    if (c && c.name && overlaps(c.startDate, c.endDate)) {
+      const [cs, ce] = clip(c.startDate, c.endDate);
+      contracts.push(Object.assign({}, c, { type:'현재계약', cs: cs, ce: ce, origS: c.startDate, origE: c.endDate }));
+    }
+    const p = room.previous;
+    if (p && p.name && overlaps(p.startDate, p.endDate)) {
+      const [ps, pe] = clip(p.startDate, p.endDate);
+      contracts.push(Object.assign({}, p, { type:'직전계약', cs: ps, ce: pe, origS: p.startDate, origE: p.endDate }));
+    }
+
+    if (!contracts.length) {
+      allRows.push([id+'호','공실','','','','',fmtDate(`${ty}-01-01`),fmtDate(`${ty}-12-31`),'공실','']);
+      return;
+    }
+
+    contracts.sort((a,b) => a.origS.localeCompare(b.origS));
+    let cur = new Date(yS);
+
+    contracts.forEach(r => {
+      const rS = new Date(Math.max(new Date(r.origS), yS));
+      if (rS > cur) {
+        // Vacant gap
+        allRows.push([id+'호','공실','','','','',
+          fmtDate(cur.toISOString().split('T')[0]),
+          fmtDate(new Date(rS-86400000).toISOString().split('T')[0]),
+          '공실','']);
+      }
+      allRows.push([id+'호', r.name||'', r.ssn||'',
+        r.deposit ? +r.deposit : '', r.monthly ? +r.monthly : '', r.maint ? +r.maint : '',
+        fmtDate(r.cs), fmtDate(r.ce), r.type, r.memo||'']);
+      const rE = new Date(Math.min(new Date(r.origE), yE));
+      cur = new Date(rE.getTime() + 86400000);
+    });
+
+    if (cur <= yE) {
+      allRows.push([id+'호','공실','','','','',
+        fmtDate(cur.toISOString().split('T')[0]),
+        fmtDate(yE.toISOString().split('T')[0]),'공실','']);
+    }
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(allRows);
+  ws['!cols'] = [8,12,16,10,8,8,14,14,10,16].map(w=>({wch:w}));
+  const hstyle = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'1F4E79'}},alignment:{horizontal:'center'}};
+  for (let c=0; c<hdrs.length; c++) {
+    const ref = XLSX.utils.encode_cell({r:0,c});
+    if (ws[ref]) ws[ref].s = hstyle;
+  }
+  XLSX.utils.book_append_sheet(wb, ws, `${ty}년 사업장현황신고`);
+  XLSX.writeFile(wb, `태영아너스_${ty}년_세무신고용_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+// ──────────── ALL EVENTS (auto + manual) ────────────
+function getAllEvents() {
+  const evs = [];
+
+  // Manual schedules
+  Object.entries(appData.schedules || {}).forEach(([id, s]) => {
+    evs.push({ id, date:s.date, title:s.title, color:s.color||'#00d2ff',
+      cat:s.cat||'manual', room:s.room, memo:s.memo, done:s.done||false, type:'manual' });
+  });
+
+  // Auto from contracts
+  ALL_ROOMS.forEach(rid => {
+    const room = appData.rooms[rid] || {};
+    const c = room.current;
+    if (!c || !c.name) return;
+
+    if (c.endDate) evs.push({
+      id:`_exp_${rid}`, date:c.endDate,
+      title:`${rid}호 계약만료 (${c.name})`,
+      color:'#ff4757', cat:'_exp', room:rid, done:false, type:'auto'
+    });
+
+    if (c.contractDate && !c.reportDone) {
+      const dl = new Date(c.contractDate); dl.setDate(dl.getDate()+90);
+      evs.push({
+        id:`_rep_${rid}`, date:dl.toISOString().split('T')[0],
+        title:`${rid}호 계약신고 기한 (${c.name})`,
+        color:'#ffa502', cat:'_report', room:rid, done:false, type:'auto'
+      });
+    }
+
+    const ins = room.insurance;
+    if (ins && ins.expiryDate) evs.push({
+      id:`_ins_${rid}`, date:ins.expiryDate,
+      title:`${rid}호 보증보험 만료`,
+      color:'#7ec8e3', cat:'_ins', room:rid, done:false, type:'auto'
+    });
+  });
+
+  return evs;
+}
+
+// ──────────── CALENDAR ────────────
+function renderCalendar() {
+  const m = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  el('monthTitle').textContent = `${calYear}년 ${m[calMonth]}`;
+  const evs = getAllEvents();
+  calView === 'calendar' ? renderCalGrid(evs) : renderListView(evs);
+  renderSchedAlerts(evs);
+  renderUpcoming();
+  renderCompleted();
+}
+
+function renderCalGrid(evs) {
+  const grid = el('calGrid'); grid.innerHTML = '';
+  const today = new Date();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const dim = new Date(calYear, calMonth+1, 0).getDate();
+  const prevDim = new Date(calYear, calMonth, 0).getDate();
+
+  // Group events by date
+  const evMap = {};
+  evs.forEach(e => { if (!evMap[e.date]) evMap[e.date]=[]; evMap[e.date].push(e); });
+
+  // Prev month
+  for (let i=firstDay-1; i>=0; i--) {
+    const c = mkCell(prevDim-i, true, false); grid.appendChild(c);
+  }
+  // Current month
+  for (let d=1; d<=dim; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const ds = date.toISOString().split('T')[0];
+    const isT = date.toDateString() === today.toDateString();
+    const dow = date.getDay();
+    const c = document.createElement('div');
+    c.className = 'cal-cell' + (isT?' today-cell':'') + (dow===0?' sunday-cell':dow===6?' saturday-cell':'');
+    c.onclick = e => { if (e.target===c || e.target.classList.contains('cal-dn') || e.target.classList.contains('cal-day-num-t')) openAddSched(ds); };
+    c.innerHTML = `<div class="cal-dn"><span class="cal-day-num-t">${d}</span>${isT?'<span class="today-badge">TODAY</span>':''}</div>`;
+    const dayEvs = evMap[ds] || [];
+    dayEvs.slice(0,3).forEach(ev => {
+      const e2 = document.createElement('div');
+      e2.className = 'cal-ev';
+      e2.style.cssText = `background:${hex2rgba(ev.color,0.18)};color:${ev.color};${ev.done?'text-decoration:line-through;opacity:0.6':''}`;
+      e2.textContent = (ev.done?'✓ ':'') + ev.title;
+      e2.onclick = ev2 => { ev2.stopPropagation(); openEvDetail(ev); };
+      c.appendChild(e2);
+    });
+    if (dayEvs.length > 3) {
+      const more = document.createElement('div');
+      more.className = 'cal-ev'; more.style.color='var(--dim)';
+      more.textContent = `+${dayEvs.length-3}개 더`;
+      c.appendChild(more);
+    }
+    grid.appendChild(c);
+  }
+  // Next month
+  const rem = (7 - (firstDay+dim)%7) % 7;
+  for (let i=1; i<=rem; i++) {
+    const c = mkCell(i, false, true); grid.appendChild(c);
+  }
+}
+
+function mkCell(d, prev, next) {
+  const c = document.createElement('div');
+  c.className = 'cal-cell other-month-cell';
+  c.innerHTML = `<div class="cal-dn"><span>${d}</span></div>`;
+  return c;
+}
+
+function renderListView(evs) {
+  const container = el('listView');
+  const monthEvs = evs.filter(e => {
+    const d = new Date(e.date);
+    return d.getFullYear()===calYear && d.getMonth()===calMonth;
+  }).sort((a,b) => a.date.localeCompare(b.date));
+
+  if (!monthEvs.length) {
+    container.innerHTML = '<div class="empty-state"><div class="ico">📭</div><p>이번 달 일정이 없습니다</p></div>';
+    return;
+  }
+  const byDate = {};
+  monthEvs.forEach(e => { if (!byDate[e.date]) byDate[e.date]=[]; byDate[e.date].push(e); });
+  const days = ['일','월','화','수','목','금','토'];
+
+  container.innerHTML = Object.entries(byDate).sort().map(([date, devs]) => {
+    const dd = new Date(date);
+    return `<div class="list-group">
+      <div class="list-group-hdr">${dd.getDate()}일 (${days[dd.getDay()]})</div>
+      ${devs.map(ev => `
+        <div class="list-event-row" onclick="openEvDetail(${JSON.stringify(ev).replace(/"/g,'&quot;')})">
+          <div class="ev-div" style="background:${ev.color}"></div>
+          <div class="ev-body">
+            <div class="name" style="${ev.done?'text-decoration:line-through;color:var(--dim)':''}">${ev.title}</div>
+            <div class="detail">${CAT_LABEL[ev.cat]||''} ${ev.room?'· '+ev.room+'호':''} ${ev.memo?'· '+ev.memo.substring(0,28):''}</div>
+          </div>
+          <div class="ev-actions">
+            ${ev.type==='manual'?`
+              <button class="act-btn done-btn" onclick="event.stopPropagation();toggleDone('${ev.id}')" title="완료">✓</button>
+              <button class="act-btn" onclick="event.stopPropagation();editSched('${ev.id}')" title="편집">✏</button>
+              <button class="act-btn del" onclick="event.stopPropagation();delSched('${ev.id}')" title="삭제">🗑</button>
+            `:'<span style="font-size:0.72rem;color:var(--dim);">자동</span>'}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+  }).join('');
+}
+
+function setView(v2) {
+  calView = v2;
+  el('calView').style.display  = v2==='calendar' ? 'block' : 'none';
+  el('listView').style.display = v2==='list' ? 'block' : 'none';
+  el('vCalBtn').classList.toggle('active', v2==='calendar');
+  el('vListBtn').classList.toggle('active', v2==='list');
+  renderCalendar();
+}
+
+function prevMonth() { calMonth--; if (calMonth<0) { calMonth=11; calYear--; } renderCalendar(); renderMiniCal(); }
+function nextMonth() { calMonth++; if (calMonth>11) { calMonth=0; calYear++; } renderCalendar(); renderMiniCal(); }
+function goToday() { calYear=new Date().getFullYear(); calMonth=new Date().getMonth(); renderCalendar(); renderMiniCal(); }
+
+// ──────────── MINI CAL ────────────
+function renderMiniCal() {
+  const m = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+  el('mcTitle').textContent = `${mcYear}.${m[mcMonth]}`;
+  const evs = getAllEvents();
+  const eDates = new Set(evs.map(e => e.date));
+  const g = el('mcGrid');
+  g.innerHTML = `<div class="mc-dow">일</div><div class="mc-dow">월</div><div class="mc-dow">화</div><div class="mc-dow">수</div><div class="mc-dow">목</div><div class="mc-dow">금</div><div class="mc-dow">토</div>`;
+
+  const fd = new Date(mcYear, mcMonth, 1).getDay();
+  const dim = new Date(mcYear, mcMonth+1, 0).getDate();
+  const pd = new Date(mcYear, mcMonth, 0).getDate();
+  const today = new Date();
+
+  for (let i=fd-1; i>=0; i--) { const d=document.createElement('div'); d.className='mc-day mc-other'; d.textContent=pd-i; g.appendChild(d); }
+  for (let d=1; d<=dim; d++) {
+    const date = new Date(mcYear, mcMonth, d);
+    const ds = date.toISOString().split('T')[0];
+    const el2 = document.createElement('div');
+    let cls = 'mc-day';
+    if (date.toDateString()===today.toDateString()) cls += ' mc-today';
+    if (date.getDay()===0) cls += ' mc-sun';
+    if (date.getDay()===6) cls += ' mc-sat';
+    if (eDates.has(ds)) cls += ' mc-has';
+    el2.className = cls; el2.textContent = d;
+    el2.onclick = () => { calYear=mcYear; calMonth=mcMonth; renderCalendar(); };
+    g.appendChild(el2);
+  }
+}
+function mcPrev() { mcMonth--; if (mcMonth<0) { mcMonth=11; mcYear--; } renderMiniCal(); }
+function mcNext() { mcMonth++; if (mcMonth>11) { mcMonth=0; mcYear++; } renderMiniCal(); }
+
+// ──────────── UPCOMING ────────────
+function renderUpcoming() {
+  const container = el('upcomingList');
+  const today = new Date();
+  const evs = getAllEvents()
+    .filter(e => { const d=dayDiff(e.date); return d!==null && d>=0 && d<=14 && !e.done; })
+    .sort((a,b) => a.date.localeCompare(b.date)).slice(0,7);
+
+  if (!evs.length) { container.innerHTML='<div style="text-align:center;padding:16px;color:var(--dim);font-size:0.83rem;">14일 이내 주요 일정 없음</div>'; return; }
+  container.innerHTML = evs.map(e => {
+    const d = dayDiff(e.date);
+    const dt = d===0 ? 'TODAY' : `D-${d}`;
+    const dc = d===0 ? 'var(--red)' : d<=3 ? 'var(--orange)' : d<=7 ? 'var(--yellow)' : 'var(--dim)';
+    return `<div class="upcoming-item" onclick="openEvDetail(${JSON.stringify(e).replace(/"/g,'&quot;')})">
+      <div class="upc-dday" style="background:${hex2rgba(e.color,0.14)};color:${e.color}"><div class="d" style="color:${dc}">${dt}</div></div>
+      <div class="upc-info"><div class="title">${e.title}</div><div class="meta">${e.date} · ${CAT_LABEL[e.cat]||''}</div></div>
+    </div>`;
+  }).join('');
+}
+
+// ──────────── COMPLETED ────────────
+function renderCompleted() {
+  const container = el('completedList');
+  const evs = getAllEvents().filter(e => e.done && new Date(e.date).getFullYear()===calYear && new Date(e.date).getMonth()===calMonth);
+  if (!evs.length) { container.innerHTML='<div style="color:var(--dim);font-size:0.82rem;">완료된 일정이 없습니다</div>'; return; }
+  container.innerHTML = evs.sort((a,b)=>a.date.localeCompare(b.date)).map(e =>
+    `<div class="comp-item"><span class="ck">✅</span><span class="ttl">${e.title}</span><span class="dt">${e.date}</span></div>`
+  ).join('');
+}
+
+// ──────────── SCHEDULE ALERTS ────────────
+function renderSchedAlerts(evs) {
+  const alerts = evs.filter(e => { const d=dayDiff(e.date); return d!==null && d>=0 && d<=90 && !e.done; });
+  const banner = el('schedAlertBanner'), items = el('schedAlertItems');
+  if (!alerts.length) { banner.classList.remove('has-alerts'); return; }
+  banner.classList.add('has-alerts');
+  items.innerHTML = alerts.slice(0,12).map(e => {
+    const d = dayDiff(e.date);
+    const cls = e.cat==='_exp' ? 'chip-ce' : e.cat==='_report'||e.cat==='contract_report' ? 'chip-re' : 'chip-ie';
+    return `<div class="alert-chip ${cls}" onclick="openEvDetail(${JSON.stringify(e).replace(/"/g,'&quot;')})">D-${d} ${e.title}</div>`;
+  }).join('');
+}
+
+// ──────────── SCHEDULE MODAL ────────────
+function openAddSched(dateStr) {
+  if (authMode !== 'admin') return;
+  editSchedId = null;
+  el('smTitle').textContent = '📅 일정 추가';
+  el('sm_title').value = '';
+  el('sm_date').value = dateStr || new Date().toISOString().split('T')[0];
+  el('sm_cat').value = 'manual';
+  el('sm_room').value = '';
+  el('sm_memo').value = '';
+  el('sm_editId').value = '';
+  selColor = '#00d2ff'; updColorPicker();
+  el('schedModal').classList.add('open');
+}
+function editSched(id) {
+  if (authMode !== 'admin') return;
+  const s = appData.schedules[id]; if (!s) return;
+  editSchedId = id;
+  el('smTitle').textContent = '✏️ 일정 편집';
+  el('sm_title').value = s.title||'';
+  el('sm_date').value = s.date||'';
+  el('sm_cat').value = s.cat||'manual';
+  el('sm_room').value = s.room||'';
+  el('sm_memo').value = s.memo||'';
+  el('sm_editId').value = id;
+  selColor = s.color||'#00d2ff'; updColorPicker();
+  el('schedModal').classList.add('open');
+}
+function closeSchedModal() { el('schedModal').classList.remove('open'); }
+
+async function saveSched() {
+  const title = v('sm_title'), date = v('sm_date');
+  if (!title || !date) { alert('제목과 날짜는 필수입니다'); return; }
+  const id = editSchedId || genId();
+  if (!appData.schedules) appData.schedules = {};
+  const prev = appData.schedules[id] || {};
+  appData.schedules[id] = {
+    title, date, cat: v('sm_cat'), room: v('sm_room'),
+    memo: v('sm_memo'), color: selColor,
+    done: prev.done || false, createdAt: prev.createdAt || Date.now()
+  };
+  await saveData();
+  closeSchedModal();
+  renderCalendar(); renderMiniCal();
+}
+
+async function delSched(id) {
+  if (!confirm('이 일정을 삭제하시겠습니까?')) return;
+  delete appData.schedules[id];
+  await saveData();
+  renderCalendar(); renderMiniCal();
+}
+
+async function toggleDone(id) {
+  if (!appData.schedules[id]) return;
+  appData.schedules[id].done = !appData.schedules[id].done;
+  await saveData();
+  renderCalendar();
+}
+
+// ──────────── EVENT DETAIL ────────────
+function openEvDetail(ev) {
+  curEvObj = ev;
+  const isAuto = ev.type === 'auto';
+  el('evDetailTitle').textContent = ev.title;
+  el('evDetailContent').innerHTML = `
+    <div style="margin-bottom:9px;">📅 <b>${ev.date}</b></div>
+    <div style="margin-bottom:9px;">🏷 ${CAT_LABEL[ev.cat]||ev.cat}</div>
+    ${ev.room ? `<div style="margin-bottom:9px;">🏠 ${ev.room}호</div>` : ''}
+    ${ev.memo ? `<div style="margin-bottom:9px;">📝 ${ev.memo}</div>` : ''}
+    ${ev.done ? '<div style="color:var(--green);">✅ 완료된 일정</div>' : ''}
+    ${isAuto ? '<div style="color:var(--dim);font-size:0.78rem;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">⚙️ 계약 데이터에서 자동 생성된 일정입니다.</div>' : ''}
+  `;
+  const doneBtn = el('evDoneBtn'), delBtn = el('evDelBtn');
+  if (isAuto || authMode==='viewer') {
+    doneBtn.style.display = 'none'; delBtn.style.display = 'none';
+  } else {
+    doneBtn.style.display = 'block'; delBtn.style.display = 'block';
+    doneBtn.textContent = ev.done ? '↩️ 완료 취소' : '✅ 완료';
+  }
+  el('evDetailModal').classList.add('open');
+}
+function closeEvDetail() { el('evDetailModal').classList.remove('open'); curEvObj = null; }
+function markDone() { if (!curEvObj || curEvObj.type==='auto') return; toggleDone(curEvObj.id); closeEvDetail(); }
+function delFromDetail() { if (!curEvObj || curEvObj.type==='auto') return; closeEvDetail(); delSched(curEvObj.id); }
+
+// ──────────── COLOR PICKER ────────────
+function selectColor(c) { selColor = c; updColorPicker(); }
+function updColorPicker() {
+  document.querySelectorAll('.color-chip').forEach(ch => {
+    const sel = ch.dataset.c === selColor;
+    ch.classList.toggle('selected', sel);
+    ch.style.border = sel ? '2px solid white' : '2px solid transparent';
+  });
+}
+
+// ──────────── YEARLY COMPLETED ────────────
+function openYearlyModal() {
+  const sel = el('yearlySelect'); sel.innerHTML = '';
+  const cy = new Date().getFullYear();
+  for (let y=cy; y>=cy-4; y--) {
+    const o = document.createElement('option'); o.value=y; o.textContent=y+'년'; if(y===cy) o.selected=true;
+    sel.appendChild(o);
+  }
+  el('yearlyModal').classList.add('open');
+  renderYearlyComp();
+}
+function renderYearlyComp() {
+  const year = parseInt(el('yearlySelect').value);
+  const evs = getAllEvents().filter(e => e.done && new Date(e.date).getFullYear()===year).sort((a,b)=>a.date.localeCompare(b.date));
+  const c = el('yearlyContent');
+  if (!evs.length) { c.innerHTML=`<div class="empty-state"><div class="ico">📭</div><p>${year}년 완료된 일정이 없습니다</p></div>`; return; }
+  c.innerHTML = evs.map(e =>
+    `<div class="comp-item"><span class="ck">✅</span><span class="ttl">${e.title}</span><span class="dt">${e.date}</span></div>`
+  ).join('');
+}
+
+// ──────────── TABS ────────────
+function switchTab(tab) {
+  ['C','S','R','T','P'].forEach(t => {
+    const btn = el(`tab${t}`);
+    if (btn) btn.classList.toggle('active', 
+      (tab==='contract'&&t==='C')||
+      (tab==='schedule'&&t==='S')||
+      (tab==='rent'&&t==='R')||
+      (tab==='tx'&&t==='T')||
+      (tab==='pnl'&&t==='P')
+    );
+  });
+  el('contractTab').classList.toggle('active', tab==='contract');
+  el('scheduleTab').classList.toggle('active', tab==='schedule');
+  if (el('rentTab')) el('rentTab').classList.toggle('active', tab==='rent');
+  if (el('txTab')) el('txTab').classList.toggle('active', tab==='tx');
+  if (el('pnlTab')) {
+    el('pnlTab').classList.toggle('active', tab==='pnl');
+    if (tab==='pnl' && !el('pnlMonth').value) {
+      el('pnlMonth').value = getCurrMonthStr();
+      renderPnl();
+    }
+  }
+  
+  if (tab==='schedule') { renderCalendar(); renderMiniCal(); }
+}
+
+// ──────────── BACKUP / RESTORE ────────────
+function backupJSON() {
+  el('exportMenu').classList.remove('open');
+  const blob = new Blob([JSON.stringify(appData,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `태영아너스_백업_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+async function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const text = await file.text();
+  try {
+    const imp = JSON.parse(text);
+    if (!confirm('현재 데이터를 백업 파일로 덮어씁니다. 계속하시겠습니까?')) return;
+    appData = imp;
+    await saveData();
+    refreshUI();
+    alert('✅ 데이터가 복원되었습니다.');
+  } catch(err) { alert('올바른 JSON 파일이 아닙니다.'); }
+  e.target.value = '';
+}
+
+function parseExcelDate(val) {
+  if (!val) return '';
+  if (typeof val === 'number') {
+    const d = new Date(Math.round((val - 25569)*86400*1000));
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  }
+  let s = String(val).replace(/\s/g,'').replace(/\./g,'-').replace(/\//g,'-');
+  const m = s.match(/(\d{2,4})-(\d{1,2})-(\d{1,2})/);
+  if(m) {
+    let y = parseInt(m[1],10), mo = parseInt(m[2],10), d = parseInt(m[3],10);
+    if(y < 100) y += 2000;
+    return y + '-' + String(mo).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  }
+  return String(val);
+}
+
+async function importExcelData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  
+  const isPrev = document.getElementById('chkPrevContract') ? document.getElementById('chkPrevContract').checked : false;
+  
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+      
+      let hdrIdx = -1;
+      for(let i=0; i<Math.min(15, rows.length); i++) {
+        if(rows[i].some(function(c){ return typeof c==='string' && (c.indexOf('호실')>-1 || c.indexOf('성명')>-1 || c.indexOf('보증금')>-1); })) {
+          hdrIdx = i; break;
+        }
+      }
+      if(hdrIdx === -1) { alert('엑셀 양식에서 호실/성명 등의 열을 찾을 수 없습니다.'); e.target.value=''; return; }
+      
+      const hdrs = rows[hdrIdx];
+      let importCount = 0;
+      
+      for(let i=hdrIdx+1; i<rows.length; i++) {
+        const row = rows[i];
+        if(!row || !row.length) continue;
+        
+        let roomId = '';
+        let cData = {};
+        let insData = {};
+        
+        hdrs.forEach(function(h, cIdx) {
+          if(!h) return;
+          const val = row[cIdx];
+          if(val === undefined || val === null || val === '') return;
+          const hs = String(h).replace(/\s/g,'');
+          
+          if(hs.indexOf('호실')>-1 || hs==='호') roomId = String(val).replace(/[^0-9]/g,'');
+          else if(hs.indexOf('성명')>-1 || hs.indexOf('이름')>-1) cData.name = String(val);
+          else if(hs.indexOf('주민번호')>-1 || hs.indexOf('주민등록')>-1) cData.ssn = String(val);
+          else if(hs.indexOf('전화')>-1 || hs.indexOf('연락처')>-1) cData.phone = String(val);
+          else if(hs.indexOf('보증금')>-1) cData.deposit = String(val);
+          else if(hs.indexOf('월세')>-1) cData.monthly = String(val);
+          else if(hs.indexOf('관리비')>-1) cData.maint = String(val);
+          else if(hs.indexOf('시작')>-1 || hs.indexOf('입주')>-1 || hs.indexOf('계약일')>-1) cData.startDate = parseExcelDate(val);
+          else if(hs.indexOf('만료')>-1 || hs.indexOf('만기')>-1 || hs.indexOf('종료')>-1 || hs.indexOf('종료일')>-1) cData.endDate = parseExcelDate(val);
+          else if(hs.indexOf('기간')>-1) {
+            const s = String(val);
+            const parts = s.split(/~| - | ~ /);
+            if (parts.length >= 2) {
+              cData.startDate = parseExcelDate(parts[0].trim());
+              cData.endDate = parseExcelDate(parts[1].trim());
+            } else if (s.indexOf('-') > -1 && s.split('-').length === 2 && s.indexOf('.') > -1) {
+              const p2 = s.split('-');
+              cData.startDate = parseExcelDate(p2[0].trim());
+              cData.endDate = parseExcelDate(p2[1].trim());
+            } else {
+              cData.startDate = parseExcelDate(val);
+            }
+          }
+          else if(hs.indexOf('비고')>-1 || hs.indexOf('메모')>-1 || hs.indexOf('특이사항')>-1) cData.memo = String(val);
+          else if(hs.indexOf('보험')>-1) insData.expiryDate = parseExcelDate(val);
+        });
+        
+        if (roomId && ALL_ROOMS.indexOf(roomId) > -1 && cData.name) {
+          if (!appData.rooms[roomId]) appData.rooms[roomId] = { contracts: [] };
+          const room = appData.rooms[roomId];
+          if (!room.contracts) room.contracts = [];
+          
+          let target = null;
+          if (cData.startDate) {
+            target = room.contracts.find(c => c.name === cData.name && c.startDate === cData.startDate);
+          }
+          if (!target) target = room.contracts.find(c => c.name === cData.name);
+          
+          if (!target) {
+            target = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5) };
+            room.contracts.push(target);
+          }
+          Object.assign(target, cData);
+          
+          if (!isPrev && insData.expiryDate) {
+             if (!room.insurance) room.insurance = {};
+             room.insurance.expiryDate = insData.expiryDate;
+          }
+          importCount++;
+        }
+      }
+      
+      // Sort contracts after import
+      ALL_ROOMS.forEach(id => {
+        if (appData.rooms[id] && appData.rooms[id].contracts) {
+          appData.rooms[id].contracts.sort((a,b) => (new Date(b.startDate||"1900-01-01")) - (new Date(a.startDate||"1900-01-01")));
+        }
+      });
+      
+      if (importCount > 0) {
+        await saveData();
+        refreshUI();
+        alert('✅ 총 ' + importCount + '세대의 현황 데이터가 엑셀에서 성공적으로 입력/업데이트되었습니다!');
+      } else {
+        alert('가져올 데이터가 없거나 엑셀 양식이 맞지 않습니다.');
+      }
+    } catch(err) {
+      alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+    }
+    e.target.value = '';
+
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ──────────── SETTINGS ────────────
+function openSettings() { el('settingsModal').classList.add('open'); }
+
+// ──────────── BULK DELETE ────────────
+function openBulkDeleteModal() {
+  const c = el('bdList'); c.innerHTML = '';
+  let count = 0;
+  ALL_ROOMS.forEach(function(id) {
+    if (appData.rooms[id] && (appData.rooms[id].current || appData.rooms[id].previous)) {
+      const nm = (appData.rooms[id].current && appData.rooms[id].current.name) ? appData.rooms[id].current.name : '데이터있음';
+      c.innerHTML += '<label class="bd-item"><input type="checkbox" value="'+id+'"> '+id+'호<br><span style="font-size:0.75rem;color:var(--dim);">'+nm+'</span></label>';
+      count++;
+    }
+  });
+  if (count === 0) c.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--dim);">삭제할 데이터가 없습니다.</div>';
+  el('bulkDeleteModal').classList.add('open');
+}
+function closeBulkDeleteModal() { el('bulkDeleteModal').classList.remove('open'); }
+function toggleAllBulkDelete(chk) {
+  document.querySelectorAll('#bdList input[type="checkbox"]').forEach(function(cb){ cb.checked = chk; });
+}
+async function execBulkDelete() {
+  const cbs = document.querySelectorAll('#bdList input[type="checkbox"]:checked');
+  if (cbs.length === 0) { alert('삭제할 호실을 선택하세요.'); return; }
+  if (!confirm(cbs.length + '개 호실의 데이터를 정말 삭제하시겠습니까?\n(계약 정보와 보증보험 내역이 모두 초기화됩니다)')) return;
+  
+  cbs.forEach(function(cb) {
+    const id = cb.value;
+    if (appData.rooms[id]) {
+      delete appData.rooms[id].current;
+      delete appData.rooms[id].previous;
+      delete appData.rooms[id].insurance;
+    }
+  });
+  await saveData();
+  refreshUI();
+  closeBulkDeleteModal();
+  alert('✅ 선택한 ' + cbs.length + '개 호실의 데이터가 삭제되었습니다.');
+}
+
+// ──────────── MODAL CLOSE ON BG CLICK ────────────
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if (e.target===ov) ov.classList.remove('open'); });
+});
+
+// ──────────── TRANSACTIONS & P&L ────────────
+const TX_CATEGORIES = [
+  { val: '', label: '-- 미분류 --', type: '' },
+  { val: 'inc_rent', label: '🟢 월세', type: 'inc' },
+  { val: 'inc_other', label: '🟢 기타수입', type: 'inc' },
+  { val: 'exp_loan', label: '🔴 대출이자', type: 'exp' },
+  { val: 'exp_water', label: '🔴 수도요금', type: 'exp' },
+  { val: 'exp_elec', label: '🔴 전기요금', type: 'exp' },
+  { val: 'exp_maint', label: '🔴 위탁관리비', type: 'exp' },
+  { val: 'exp_safecar', label: '🔴 차량승강기 안전관리', type: 'exp' },
+  { val: 'exp_taxacct', label: '🔴 기장료', type: 'exp' },
+  { val: 'exp_safefire', label: '🔴 소방안전관리', type: 'exp' },
+  { val: 'exp_safeelec', label: '🔴 전기안전관리', type: 'exp' },
+  { val: 'exp_clean', label: '🔴 건물 청소비', type: 'exp' },
+  { val: 'exp_internet', label: '🔴 공용 인터넷TV', type: 'exp' },
+  { val: 'exp_safeelev', label: '🔴 승강기안전관리', type: 'exp' },
+  { val: 'exp_card', label: '🔴 카드대금', type: 'exp' },
+  { val: 'exp_phone', label: '🔴 휴대폰 요금', type: 'exp' },
+  { val: 'exp_cleanout', label: '🔴 퇴실청소', type: 'exp' },
+  { val: 'exp_roomelec', label: '🔴 세대 전기요금', type: 'exp' },
+  { val: 'exp_broker', label: '🔴 중개수수료', type: 'exp' },
+  { val: 'exp_wallpaper', label: '🔴 도배비용', type: 'exp' },
+  { val: 'exp_localtax', label: '🔴 지방세', type: 'exp' },
+  { val: 'exp_insfee', label: '🔴 보증보험 수수료', type: 'exp' },
+  { val: 'exp_etc', label: '🔴 기타 잡비', type: 'exp' },
+  { val: 'inc_deposit', label: '🔵 보증금 입금 (부채증가)', type: 'inc_dep' },
+  { val: 'inc_dep_rent', label: '🟣 보증금+월세 합산 입금', type: 'inc_dep' },
+  { val: 'exp_deposit', label: '🔵 보증금 반환 (부채감소)', type: 'exp_dep' },
+  { val: 'transfer_in', label: '⚪ 자금 이동 (수입제외)', type: 'transfer' },
+  { val: 'transfer_out', label: '⚪ 자금 이동 (지출제외)', type: 'transfer' }
+];
+
+function guessTxCategory(desc, isIncome) {
+  if (!desc) return '';
+  if (isIncome) {
+    if (desc.indexOf('임해경') > -1) return 'transfer_in';
+    if (desc.indexOf('보증') > -1 || desc.indexOf('계약') > -1 || desc.indexOf('잔금') > -1) return 'inc_deposit';
+    if (desc.indexOf('이자') > -1) return 'inc_other';
+    return 'inc_rent'; 
+  } else {
+    if (desc.indexOf('임해경') > -1) return 'transfer_out';
+    if (desc.indexOf('보증') > -1 || desc.indexOf('반환') > -1 || desc.indexOf('정산') > -1) return 'exp_deposit';
+    if (desc.indexOf('이자') > -1 || desc.indexOf('대출') > -1) return 'exp_loan';
+    if (desc.indexOf('수도') > -1) return 'exp_water';
+    if (desc.indexOf('한전') > -1 || desc.indexOf('전기') > -1) return 'exp_elec';
+    if (desc.indexOf('관리') > -1) return 'exp_maint';
+    if (desc.indexOf('기장') > -1 || desc.indexOf('세무') > -1) return 'exp_taxacct';
+    if (desc.indexOf('소방') > -1) return 'exp_safefire';
+    if (desc.indexOf('청소') > -1) return 'exp_clean';
+    if (desc.indexOf('인터넷') > -1 || desc.indexOf('통신') > -1 || desc.indexOf('티비') > -1) return 'exp_internet';
+    if (desc.indexOf('승강기') > -1 || desc.indexOf('엘리베이터') > -1) return 'exp_safeelev';
+    if (desc.indexOf('카드') > -1) return 'exp_card';
+    if (desc.indexOf('휴대폰') > -1 || desc.indexOf('에스케이') > -1 || desc.indexOf('케이티') > -1 || desc.indexOf('유플러스') > -1) return 'exp_phone';
+    if (desc.indexOf('수수료') > -1 || desc.indexOf('부동산') > -1 || desc.indexOf('공인') > -1) return 'exp_broker';
+    if (desc.indexOf('도배') > -1 || desc.indexOf('장판') > -1) return 'exp_wallpaper';
+    if (desc.indexOf('세금') > -1 || desc.indexOf('지방세') > -1) return 'exp_localtax';
+    if (desc.indexOf('보증') > -1 || desc.indexOf('보험') > -1) return 'exp_insfee';
+    return 'exp_etc';
+  }
+}
+
+function bulkDeleteTx() {
+  const pm = el('txMonth') ? el('txMonth').value : getCurrMonthStr();
+  if (!pm) return;
+  if (!confirm(`조회 중인 ${pm}월의 모든 거래내역을 삭제하시겠습니까?\n\n- 확인 클릭 시: ${pm}월 내역만 삭제\n- 다른 월의 내역은 그대로 유지됩니다.`)) return;
+  
+  if (!appData.transactions) return;
+  const beforeCount = appData.transactions.length;
+  appData.transactions = appData.transactions.filter(t => !t.date.startsWith(pm));
+  const afterCount = appData.transactions.length;
+  
+  saveData().then(() => {
+    refreshUI();
+    alert(`✅ ${pm}월 거래내역 ${beforeCount - afterCount}건이 삭제되었습니다.`);
+  });
+}
+
+function setSortTx(k) {
+  if (txSortKey === k) txSortDir = txSortDir === 'asc' ? 'desc' : 'asc';
+  else { txSortKey = k; txSortDir = 'desc'; }
+  ['date','desc','income','expense','category'].forEach(x => {
+    const arr = document.getElementById('txSortArr_' + x);
+    if(arr) {
+      if(txSortKey === x) {
+        arr.style.opacity = '1'; arr.style.color = 'var(--gold)';
+        arr.textContent = txSortDir === 'asc' ? '▲' : '▼';
+      } else {
+        arr.style.opacity = '0.2'; arr.style.color = 'inherit';
+        arr.textContent = '▼▲';
+      }
+    }
+  });
+  renderTxGrid();
+}
+
+function matchRoomForRent(desc) {
+  if (!desc) return '';
+  for (let id of ALL_ROOMS) {
+    const room = appData.rooms[id];
+    if(!room) continue;
+    const c = room.current || {};
+    
+    // Exact word boundary match for room number to prevent 1305 matching 305
+    const regex = new RegExp("(?:^|[^\\d])" + id + "(?:[^\\d]|$)");
+    if (regex.test(desc)) return id;
+    
+    if (c.name && desc.indexOf(c.name) > -1) return id;
+    if (c.memo) {
+      const words = c.memo.split(/[\s,]+/);
+      for (let w of words) {
+        if (w.length >= 2 && desc.indexOf(w) > -1) return id;
+      }
+    }
+  }
+  return '';
+}
+
+function guessFromHistory(desc, isIncome) {
+  const txs = appData.transactions || [];
+  for (let i = txs.length - 1; i >= 0; i--) {
+    const t = txs[i];
+    if (t.desc === desc) {
+      if (isIncome && t.income > 0 && t.category) return { cat: t.category, room: t.matchedRoom || '' };
+      if (!isIncome && t.expense > 0 && t.category) return { cat: t.category, room: t.matchedRoom || '' };
+    }
+  }
+  return null;
+}
+
+async function importTxExcelData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(evt) {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+      
+      let hdrIdx = -1;
+      for(let i=0; i<Math.min(15, rows.length); i++) {
+        if(rows[i].some(function(c){ return typeof c==='string' && (c.indexOf('맡기신')>-1 || c.indexOf('찾으신')>-1 || c.indexOf('수입')>-1 || c.indexOf('지출')>-1 || c.indexOf('거래내용')>-1 || c.indexOf('적요')>-1); })) {
+          hdrIdx = i; break;
+        }
+      }
+      if(hdrIdx === -1) { alert('통장내역 엑셀 양식을 인식할 수 없습니다. (맡기신금액, 찾으신금액, 거래내용 등이 필요합니다)'); e.target.value=''; return; }
+      
+      const hdrs = rows[hdrIdx];
+      let dtCol=-1, incCol=-1, expCol=-1, balCol=-1, descCol=-1, descCol2=-1;
+      
+      hdrs.forEach((h, idx) => {
+        if(typeof h !== 'string') return;
+        if(h.indexOf('날짜')>-1 || h.indexOf('일시')>-1 || h.indexOf('거래일')>-1) dtCol = idx;
+        else if(h.indexOf('맡기신')>-1 || h.indexOf('입금')>-1 || h.indexOf('수입')>-1) incCol = idx;
+        else if(h.indexOf('찾으신')>-1 || h.indexOf('출금')>-1 || h.indexOf('지출')>-1) expCol = idx;
+        else if(h.indexOf('잔액')>-1) balCol = idx;
+        else if(h.indexOf('기록사항')>-1 || h.indexOf('기록')>-1) descCol2 = idx;
+        else if(h.indexOf('내용')>-1 || h.indexOf('적요')>-1) descCol = idx;
+      });
+      
+      if (!appData.transactions) appData.transactions = [];
+      let added = 0;
+      
+      for(let i=hdrIdx+1; i<rows.length; i++) {
+        const r = rows[i];
+        if(!r || r.length === 0) continue;
+        let dt = r[dtCol], inc = r[incCol]||0, exp = r[expCol]||0, bal = r[balCol]||0;
+        let d1 = String(r[descCol]||'').trim();
+        let d2 = descCol2 !== -1 ? String(r[descCol2]||'').trim() : '';
+        let desc = d2 ? d2 : d1; // 기재내용(기록사항) 우선
+        
+        if(!dt || (inc===0 && exp===0)) continue;
+        
+        let dateStr = typeof dt==='number' ? parseExcelDate(dt) : String(dt).trim();
+        if(!dateStr) continue;
+        
+        // 날짜 정리
+        dateStr = dateStr.replace(/[^0-9-.\/]/g, ' ').trim().split(' ')[0].replace(/\//g,'-').replace(/\./g,'-');
+        
+        inc = parseInt(String(inc).replace(/[^0-9]/g,''))||0;
+        exp = parseInt(String(exp).replace(/[^0-9]/g,''))||0;
+        bal = parseInt(String(bal).replace(/[^0-9-]/g,''))||0;
+        
+        const isIncome = inc > 0;
+        let cat = '';
+        let matchedRoom = '';
+        
+        const hist = guessFromHistory(desc, isIncome);
+        if (hist) {
+          cat = hist.cat;
+          matchedRoom = hist.room;
+        } else {
+          cat = guessTxCategory(desc, isIncome);
+          if (cat === 'inc_rent' || cat === 'inc_deposit' || cat === 'exp_deposit') {
+            matchedRoom = matchRoomForRent(desc);
+          }
+        }
+        
+        appData.transactions.push({
+          id: genId(),
+          date: dateStr,
+          desc: desc,
+          income: inc,
+          expense: exp,
+          balance: bal,
+          category: cat,
+          matchedRoom: matchedRoom
+        });
+        added++;
+      }
+      
+      if(added > 0) {
+        appData.transactions.sort((a,b) => a.date.localeCompare(b.date));
+        await saveData();
+        refreshUI();
+        alert(`✅ ${added}건의 통장내역이 성공적으로 업로드 되었습니다.`);
+      } else {
+        alert('업로드할 내역을 찾지 못했습니다.');
+      }
+    } catch(err) {
+      console.error(err);
+      alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
+    }
+    e.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderTxGrid() {
+  const tbd = el('txGridBody');
+  if(!tbd) return;
+  tbd.innerHTML = '';
+  
+  let txs = appData.transactions || [];
+  const filterMonth = el('txMonth') ? el('txMonth').value : '';
+  if (filterMonth) {
+    txs = txs.filter(t => t.date.startsWith(filterMonth));
+  }
+  
+  if(!txs.length) {
+    tbd.innerHTML = '<tr><td colspan="8" class="td-center" style="padding:30px; color:var(--dim);">등록된 거래내역이 없습니다.<br>우측 상단의 [통장엑셀 업로드] 버튼을 통해 내역을 추가해 보세요.<br>(조회 기준월을 변경하여 다른 달의 내역을 볼 수도 있습니다)</td></tr>';
+    return;
+  }
+  
+  const sorted = txs.slice().sort((a,b) => {
+    let cmp = 0;
+    switch(txSortKey) {
+      case 'date': cmp = a.date.localeCompare(b.date); break;
+      case 'desc': cmp = (a.desc||'').localeCompare(b.desc||''); break;
+      case 'income': cmp = (a.income||0) - (b.income||0); break;
+      case 'expense': cmp = (a.expense||0) - (b.expense||0); break;
+      case 'category': cmp = (a.category||'').localeCompare(b.category||''); break;
+    }
+    return txSortDir === 'asc' ? cmp : -cmp;
+  });
+  
+  let html = '';
+  sorted.forEach(t => {
+    let opts = TX_CATEGORIES.map(c => `<option value="${c.val}" ${t.category===c.val?'selected':''}>${c.label}</option>`).join('');
+    let roomOpts = `<option value="">- 매칭 없음 -</option>` + ALL_ROOMS.map(rid => `<option value="${rid}" ${t.matchedRoom===String(rid)?'selected':''}>${rid}호</option>`).join('');
+    
+    html += `<tr>
+      <td>${t.date}</td>
+      <td style="font-weight:700;">${t.desc}</td>
+      <td class="td-center">
+        <select class="tx-select" onchange="updateTxRoom('${t.id}', this.value)" style="margin:0; width:100%; min-width:100px;">
+          ${roomOpts}
+        </select>
+      </td>
+      <td class="td-right" style="color:var(--gold);">${t.income > 0 ? formatMoney(t.income) : '-'}</td>
+      <td class="td-right" style="color:var(--red);">${t.expense > 0 ? formatMoney(t.expense) : '-'}</td>
+      <td class="td-right" style="color:var(--dim);">${formatMoney(t.balance)}</td>
+      <td class="td-center">
+        <select class="tx-select" onchange="updateTxCategory('${t.id}', this.value)" style="margin:0; width:100%; min-width:140px;">
+          ${opts}
+        </select>
+      </td>
+      <td class="td-center"><button class="btn-cancel" onclick="delTx('${t.id}')" style="padding:4px 8px; font-size:0.7rem;">삭제</button></td>
+    </tr>`;
+  });
+  tbd.innerHTML = html;
+}
+
+function updateTxRoom(id, val) {
+  const tx = (appData.transactions || []).find(t => t.id === id);
+  if(tx) {
+    tx.matchedRoom = val;
+    saveData();
+  }
+}
+
+
+
+function updateTxCategory(id, val) {
+  const tx = (appData.transactions || []).find(t => t.id === id);
+  if(tx) {
+    tx.category = val;
+    if (val === 'inc_dep_rent') {
+      let defaultRent = 0;
+      if (tx.matchedRoom && appData.rooms[tx.matchedRoom] && appData.rooms[tx.matchedRoom].contracts) {
+        const txParts = tx.date.split('-');
+        if (txParts.length >= 2) {
+          const normTxDate = `${txParts[0]}-${txParts[1].padStart(2, '0')}`;
+          const contractsInMonth = getContractsInMonth(appData.rooms[tx.matchedRoom], normTxDate);
+          const c = contractsInMonth.length > 0 ? contractsInMonth[0] : null;
+          if (c) {
+            const monNum = parseInt(String(c.monthly).replace(/[^0-9-]/g, ''), 10) || 0;
+            const mntNum = parseInt(String(c.maint).replace(/[^0-9-]/g, ''), 10) || 0;
+            defaultRent = monNum + mntNum;
+          }
+        }
+      }
+      const ans = prompt('보증금+월세 합산 항목입니다.\n\n수입(월세+관리비)으로 산정할 금액을 입력하세요.\n나머지는 보증금(부채)으로 자동 처리됩니다.', defaultRent || '');
+      if (ans !== null) {
+        tx.rentAmount = parseInt(String(ans).replace(/[^0-9-]/g, ''), 10) || 0;
+      }
+    }
+    saveData().then(() => { renderPnl(); renderTxGrid(); });
+  }
+}
+
+function delTx(id) {
+  if(!confirm('이 거래내역을 삭제하시겠습니까?')) return;
+  appData.transactions = (appData.transactions || []).filter(t => t.id !== id);
+  saveData().then(() => { refreshUI(); });
+}
+
+function renderPnl() {
+  if(!el('pnlMonth')) return;
+  const pm = el('pnlMonth').value; // YYYY-MM
+  if(!pm) return;
+  
+  const txs = (appData.transactions || []).filter(t => t.date.startsWith(pm));
+  
+  let totalInc = 0;
+  let totalExp = 0;
+  let depInc = 0;
+  let depExp = 0;
+  
+  const incMap = {};
+  const expMap = {};
+  const depMap = {};
+  
+  TX_CATEGORIES.forEach(c => {
+    if(c.type === 'inc') incMap[c.val] = 0;
+    if(c.type === 'exp') expMap[c.val] = 0;
+    if(c.type === 'inc_dep' || c.type === 'exp_dep') depMap[c.val] = 0;
+  });
+  incMap[''] = 0; // 미분류 수입
+  expMap[''] = 0; // 미분류 지출
+  
+  const depIncDetails = [];
+  const depExpDetails = [];
+  
+  txs.forEach(t => {
+    const c = t.category || '';
+    if (c === 'transfer_in' || c === 'transfer_out') return; 
+    
+    const isIncDep = c === 'inc_deposit';
+    const isExpDep = c === 'exp_deposit';
+    const isDepRent = c === 'inc_dep_rent';
+    
+    if(t.income > 0) {
+      if(isDepRent) {
+        const rentAmt = t.rentAmount || 0;
+        const depAmt = t.income - rentAmt;
+        if (rentAmt > 0) {
+          totalInc += rentAmt;
+          if (incMap['inc_rent'] !== undefined) incMap['inc_rent'] += rentAmt;
+        }
+        if (depAmt > 0) {
+          depInc += depAmt;
+          depIncDetails.push({ date: t.date, room: t.matchedRoom, amt: depAmt, desc: t.desc });
+        }
+      } else if(isIncDep) {
+        depInc += t.income;
+        depIncDetails.push({ date: t.date, room: t.matchedRoom, amt: t.income, desc: t.desc });
+      } else {
+        totalInc += t.income;
+        if(incMap[c] !== undefined) incMap[c] += t.income;
+        else incMap[''] += t.income;
+      }
+    }
+    if(t.expense > 0) {
+      if(isExpDep) {
+        depExp += t.expense;
+        depExpDetails.push({ date: t.date, room: t.matchedRoom, amt: t.expense, desc: t.desc });
+      } else {
+        totalExp += t.expense;
+        if(expMap[c] !== undefined) expMap[c] += t.expense;
+        else expMap[''] += t.expense;
+      }
+    }
+  });
+  
+  const net = totalInc - totalExp;
+  
+  el('pnlTotalIncome').innerHTML = formatMoney(totalInc) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  el('pnlTotalExpense').innerHTML = formatMoney(totalExp) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  el('pnlNetProfit').innerHTML = formatMoney(net) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  
+  let incHtml = '';
+  TX_CATEGORIES.filter(c => c.type==='inc').forEach(c => {
+    if(incMap[c.val] > 0) incHtml += `<div class="pnl-row"><span>${c.label}</span><span>${formatMoney(incMap[c.val])}원</span></div>`;
+  });
+  if(incMap[''] > 0) incHtml += `<div class="pnl-row"><span>⚠️ 미분류 수입</span><span style="color:var(--gold);">${formatMoney(incMap[''])}원</span></div>`;
+  if(!incHtml) incHtml = `<div class="pnl-row" style="color:var(--dim);">수입 내역이 없습니다.</div>`;
+  incHtml += `<div class="pnl-row total" style="color:#00d2ff;"><span>수입 합계</span><span>${formatMoney(totalInc)}원</span></div>`;
+  el('pnlIncomeList').innerHTML = incHtml;
+  
+  let expHtml = '';
+  TX_CATEGORIES.filter(c => c.type==='exp').forEach(c => {
+    if(expMap[c.val] > 0) expHtml += `<div class="pnl-row"><span>${c.label}</span><span>${formatMoney(expMap[c.val])}원</span></div>`;
+  });
+  if(expMap[''] > 0) expHtml += `<div class="pnl-row"><span>⚠️ 미분류 지출</span><span style="color:var(--gold);">${formatMoney(expMap[''])}원</span></div>`;
+  if(!expHtml) expHtml = `<div class="pnl-row" style="color:var(--dim);">지출 내역이 없습니다.</div>`;
+  expHtml += `<div class="pnl-row total" style="color:var(--red);"><span>지출 합계</span><span>${formatMoney(totalExp)}원</span></div>`;
+  el('pnlExpenseList').innerHTML = expHtml;
+  
+  let depIncHtml = '';
+  depIncDetails.forEach(d => {
+    const roomStr = d.room ? `${d.room}호 ` : '';
+    depIncHtml += `<div class="pnl-row"><span>${roomStr}보증금 (${d.date.substr(5)})</span><span>${formatMoney(d.amt)}원</span></div>`;
+  });
+  if(!depIncHtml) depIncHtml = `<div class="pnl-row" style="color:var(--dim);">보증금 입금 내역이 없습니다.</div>`;
+  depIncHtml += `<div class="pnl-row total" style="color:#9d50bb;"><span>입금 합계</span><span>${formatMoney(depInc)}원</span></div>`;
+  if (el('pnlDepIncList')) el('pnlDepIncList').innerHTML = depIncHtml;
+
+  let depExpHtml = '';
+  depExpDetails.forEach(d => {
+    const roomStr = d.room ? `${d.room}호 ` : '';
+    depExpHtml += `<div class="pnl-row"><span>${roomStr}보증금 반환 (${d.date.substr(5)})</span><span>${formatMoney(d.amt)}원</span></div>`;
+  });
+  if(!depExpHtml) depExpHtml = `<div class="pnl-row" style="color:var(--dim);">보증금 반환 내역이 없습니다.</div>`;
+  depExpHtml += `<div class="pnl-row total" style="color:#9d50bb;"><span>반환 합계</span><span>${formatMoney(depExp)}원</span></div>`;
+  if (el('pnlDepExpList')) el('pnlDepExpList').innerHTML = depExpHtml;
+}
+
+
+
+// ──────────── STARTUP ────────────
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
