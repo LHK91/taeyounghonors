@@ -252,6 +252,7 @@ header{
 .rt-extend { background: rgba(0,210,255,0.2); color: #00d2ff; }
 .rt-expire { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
 .rt-expire_expected { background: rgba(255,71,87,0.2); color: var(--red); border: 1px solid rgba(255,71,87,0.3); }
+.rt-upcoming { background: rgba(46,213,115,0.15); color: #2ed573; border: 1px solid rgba(46,213,115,0.3); }
 .rent-chk { width:20px; height:20px; cursor:pointer; accent-color:var(--gold); }
 .td-center { text-align:center; }
 .td-right { text-align:right; }
@@ -919,12 +920,12 @@ header{
 <!-- ====== CONTRACT MODAL ====== -->
 <div class="modal-overlay" id="contractModal">
   <div class="modal-box wide">
-    <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center;">
-      <span id="cmTitle">🏠 계약 정보</span>
-      <div style="display:flex; align-items:center; gap:5px;">
-        <select id="contractSelector" onchange="loadContractForm(this.value)" style="padding:4px; border-radius:4px; font-size:0.85rem; background:rgba(255,255,255,0.1); color:white; border:none; outline:none; max-width: 150px;"></select>
-        <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.75rem;" onclick="addNewContract()">+ 계약</button>
-        <button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; color:var(--red); border-color:rgba(255,71,87,0.3);" onclick="delContract()">삭제</button>
+    <div class="modal-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <span id="cmTitle" style="white-space:nowrap;">🏠 계약 정보</span>
+      <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+        <select id="contractSelector" onchange="loadContractForm(this.value)" style="padding:4px; border-radius:4px; font-size:0.85rem; background:rgba(255,255,255,0.1); color:white; border:none; outline:none; max-width: 150px; text-overflow:ellipsis;"></select>
+        <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.75rem; white-space:nowrap;" onclick="addNewContract()">+ 새 임차인 추가</button>
+        <button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; color:var(--red); border-color:rgba(255,71,87,0.3); white-space:nowrap;" onclick="delContract()">삭제</button>
       </div>
     </div>
     <div class="modal-tabs">
@@ -1615,12 +1616,31 @@ function getPrimaryContract(room, monthStr = null) {
   const pm = monthStr || getMainMonth();
   const arr = getContractsInMonth(room, pm);
   if (arr.length > 0) return arr[0];
+  
+  const [ty, tm] = pm.split('-').map(Number);
+  const mEnd = new Date(ty, tm, 0);
+  const futureContracts = room.contracts.filter(c => {
+    let sDate = c.startDate ? new Date(c.startDate) : new Date("2000-01-01");
+    return sDate > mEnd;
+  });
+  if (futureContracts.length > 0) {
+    futureContracts.sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
+    return futureContracts[0];
+  }
+  
   return null; 
 }
 
 function getStatus(room, targetMonthStr = null) {
   const c = getPrimaryContract(room, targetMonthStr);
   if (!c || !c.name) return 'vacant';
+  
+  const pm = targetMonthStr || getMainMonth();
+  const [ty, tm] = pm.split('-').map(Number);
+  const mEnd = new Date(ty, tm, 0);
+  const sd = c.startDate ? new Date(c.startDate) : null;
+  if (sd && sd > mEnd) return 'upcoming';
+
   if (c.renewalStatus === 'extend') return 'extend';
   const ed = c.endDate ? new Date(c.endDate) : null;
   if (c.renewalStatus === 'expire') {
@@ -1872,8 +1892,8 @@ function renderAlertBanner() {
 function renderRoomGrid() {
   const grid = el('roomGrid');
   grid.innerHTML = '';
-  const badgeMap  = { active:'rt-active', check:'rt-check', extend:'rt-extend', expire:'rt-expire', expire_expected:'rt-expire_expected', vacant:'rt-vacant' };
-  const labelMap  = { active:'계약중', check:'재계약확인', extend:'연장확정', expire:'만기종료', expire_expected:'만기종료예정', vacant:'공실' };
+  const badgeMap  = { active:'rt-active', check:'rt-check', extend:'rt-extend', expire:'rt-expire', expire_expected:'rt-expire_expected', upcoming:'rt-upcoming', vacant:'rt-vacant' };
+  const labelMap  = { active:'계약중', check:'재계약확인', extend:'연장확정', expire:'만기종료', expire_expected:'만기종료예정', upcoming:'입주예정', vacant:'공실' };
 
   const sorted = getSortedRooms();
   
