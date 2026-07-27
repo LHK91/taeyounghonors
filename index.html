@@ -1617,15 +1617,19 @@ function getPrimaryContract(room, monthStr = null) {
   const arr = getContractsInMonth(room, pm);
   if (arr.length > 0) return arr[0];
   
-  const [ty, tm] = pm.split('-').map(Number);
-  const mEnd = new Date(ty, tm, 0);
-  const futureContracts = room.contracts.filter(c => {
-    let sDate = c.startDate ? new Date(c.startDate) : new Date("2000-01-01");
-    return sDate > mEnd;
-  });
-  if (futureContracts.length > 0) {
-    futureContracts.sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
-    return futureContracts[0];
+  // Only check for future contracts if we are querying the CURRENT real-world month or later
+  const currMonth = getCurrMonthStr();
+  if (pm >= currMonth) {
+    const [ty, tm] = pm.split('-').map(Number);
+    const mEnd = new Date(ty, tm, 0);
+    const futureContracts = room.contracts.filter(c => {
+      let sDate = c.startDate ? new Date(c.startDate) : new Date("2000-01-01");
+      return sDate > mEnd;
+    });
+    if (futureContracts.length > 0) {
+      futureContracts.sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
+      return futureContracts[0];
+    }
   }
   
   return null; 
@@ -2101,9 +2105,7 @@ function renderRentGrid() {
         let ey = parseInt(c.endDate.split('-')[0]), em = parseInt(c.endDate.split('-')[1]);
         while(cy < ey || (cy === ey && cm <= em)) {
           const ms = `${cy}-${String(cm).padStart(2,'0')}`;
-          if (ms <= pm) {
-            totalExpected += calcProratedRent(monNum+mntNum, c.startDate, c.endDate, ms);
-          }
+          totalExpected += calcProratedRent(monNum+mntNum, c.startDate, c.endDate, ms);
           cm++;
           if(cm > 12) { cm=1; cy++; }
         }
