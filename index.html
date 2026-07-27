@@ -250,7 +250,8 @@ header{
 .rt-active { background: rgba(46,213,115,0.2); color: var(--green); }
 .rt-check { background: rgba(255,165,2,0.2); color: var(--orange); }
 .rt-extend { background: rgba(0,210,255,0.2); color: #00d2ff; }
-.rt-expire { background: rgba(255,71,87,0.2); color: var(--red); }
+.rt-expire { background: rgba(0,0,0,0.6); color: #fff; border: 1px solid rgba(255,255,255,0.1); }
+.rt-expire_expected { background: rgba(255,71,87,0.2); color: var(--red); border: 1px solid rgba(255,71,87,0.3); }
 .rent-chk { width:20px; height:20px; cursor:pointer; accent-color:var(--gold); }
 .td-center { text-align:center; }
 .td-right { text-align:right; }
@@ -804,7 +805,10 @@ header{
   <!-- ===== CONTRACT TAB ===== -->
   <div class="tab-content active" id="contractTab">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
-      <h2 style="font-size:1.15rem; margin:0;">📋 호실별 계약 현황</h2>
+      <div style="font-size:1.15rem; font-weight:900; color:var(--gold); display:flex; align-items:center; gap:8px; margin:0;">
+        📋 호실별 계약 현황
+        <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:#00d2ff;" onclick="openContractModal(ALL_ROOMS[0])">+ 수기 계약 등록</button>
+      </div>
       <div style="display:flex; align-items:center; gap:10px;">
         <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">조회 시점</label>
         <div style="display:flex; align-items:center; gap:4px;">
@@ -1120,6 +1124,8 @@ header{
             <th>임차인</th>
             <th class="td-right">보증금</th>
             <th class="td-right">월세+관리비 합계</th>
+            <th class="td-center">최종 납부일</th>
+            <th class="td-right">누적납부 / 총예상액</th>
             <th class="td-center">기존 미납액 (직접입력)</th>
             <th class="td-center">당월 납부확인</th>
             <th class="td-center">비고</th>
@@ -1145,7 +1151,7 @@ header{
       <div style="display:flex; gap:10px;">
         <button class="btn btn-red-o" onclick="bulkDeleteTx()" style="padding:6px 12px; font-size:0.8rem; margin:0;">🗑 일괄 삭제</button>
         <label class="btn btn-gold" style="cursor:pointer;margin-bottom:0;">
-          ✨ 통장엑셀 업로드 <input type="file" style="display:none" accept=".xlsx, .xls" onchange="importTxExcelData(event)">
+          ✨ 통장엑셀 업로드 <input type="file" style="display:none" accept=".xlsx, .xls" multiple onchange="importTxExcelData(event)">
         </label>
       </div>
     </div>
@@ -1609,24 +1615,32 @@ function getPrimaryContract(room, monthStr = null) {
   const pm = monthStr || getMainMonth();
   const arr = getContractsInMonth(room, pm);
   if (arr.length > 0) return arr[0];
-  return room.contracts[0]; 
+  return null; 
 }
 
 function getStatus(room, targetMonthStr = null) {
   const c = getPrimaryContract(room, targetMonthStr);
   if (!c || !c.name) return 'vacant';
   if (c.renewalStatus === 'extend') return 'extend';
-  if (c.renewalStatus === 'expire') return 'expire';
-  
   const ed = c.endDate ? new Date(c.endDate) : null;
+  if (c.renewalStatus === 'expire') {
+    if (ed) {
+      const now = new Date();
+      now.setHours(0,0,0,0);
+      const edCopy = new Date(ed.getTime());
+      edCopy.setHours(0,0,0,0);
+      if (edCopy > now) return 'expire_expected';
+    }
+    return 'expire';
+  }
+  
   if (!ed) return 'active';
   
-  const pm = targetMonthStr || getMainMonth();
-  const [ty, tm] = pm.split('-').map(Number);
-  const targetDate = new Date(ty, tm, 0); // End of month
+  // 만기일은 무조건 '현재(오늘 시각)' 기준으로 계산하여, 예전 시점을 조회하더라도 현재 연장안된 계약은 '만기종료(검은색뱃지)'가 되게 합니다.
+  const targetDate = new Date();
   
   const d = Math.floor((ed - targetDate) / 86400000);
-  if (d < 0) return 'expired';
+  if (d < 0) return 'expire'; // 'expire' 뱃지 적용 (검은색 CSS)
   if (d <= 90) return 'check';
   return 'active';
 }
@@ -1858,8 +1872,8 @@ function renderAlertBanner() {
 function renderRoomGrid() {
   const grid = el('roomGrid');
   grid.innerHTML = '';
-  const badgeMap  = { active:'rt-active', check:'rt-check', extend:'rt-extend', expire:'rt-expire', vacant:'rt-vacant' };
-  const labelMap  = { active:'계약중', check:'재계약확인', extend:'연장확정', expire:'만기종료', vacant:'공실' };
+  const badgeMap  = { active:'rt-active', check:'rt-check', extend:'rt-extend', expire:'rt-expire', expire_expected:'rt-expire_expected', vacant:'rt-vacant' };
+  const labelMap  = { active:'계약중', check:'재계약확인', extend:'연장확정', expire:'만기종료', expire_expected:'만기종료예정', vacant:'공실' };
 
   const sorted = getSortedRooms();
   
@@ -1914,9 +1928,9 @@ function renderRoomGrid() {
     
     // Report
     let repHtml = '-';
-    if (s !== 'vacant' && c.contractDate) {
-      if (c.reportDone) repHtml = `<span style="color:var(--green);font-weight:700;">완료</span>`;
-      else repHtml = `<span style="color:var(--red);font-weight:700;">미신고</span>`;
+    if (s !== 'vacant') {
+      if (c.reportDone) repHtml = `<span style="color:var(--green);font-weight:700; background:rgba(46,213,115,0.15); padding:3px 6px; border-radius:4px;">✅ 신고완료</span>`;
+      else repHtml = `<span style="color:var(--red);font-weight:700; background:rgba(255,71,87,0.15); padding:3px 6px; border-radius:4px;">❌ 미신고</span>`;
     }
     
     html += `<tr onclick="openContractModal('${id}')">
@@ -2052,11 +2066,50 @@ function renderRentGrid() {
       const memo = c.memo ? `<span data-tip="${c.memo.replace(/"/g, '&quot;')}">📝</span>` : '';
       const dispReq = (prorated !== (monNum+mntNum)) ? `<span style="color:var(--gold);">${formatMoney(prorated)}</span> <span style="font-size:0.7rem;color:var(--dim);">(일할정산)</span>` : `<span style="color:var(--gold);">${formatMoney(totalReq)}</span>`;
       
+      // Calculate Last Paid Date
+      let lastPaidDate = '-';
+      const pmEnd = pm + '-31'; // safe assumption for string comparison
+      const paidTxs = txs.filter(t => t.matchedRoom === String(id) && (t.category === 'inc_rent' || t.category === 'inc_dep_rent') && t.date <= pmEnd);
+      if (paidTxs.length > 0) {
+        lastPaidDate = paidTxs[paidTxs.length - 1].date; // since txs is sorted asc
+      }
+      
+      // Calculate Total Expected vs Total Paid
+      let totalExpected = 0;
+      if (c.startDate && c.endDate) {
+        let cy = parseInt(c.startDate.split('-')[0]), cm = parseInt(c.startDate.split('-')[1]);
+        let ey = parseInt(c.endDate.split('-')[0]), em = parseInt(c.endDate.split('-')[1]);
+        while(cy < ey || (cy === ey && cm <= em)) {
+          const ms = `${cy}-${String(cm).padStart(2,'0')}`;
+          if (ms <= pm) {
+            totalExpected += calcProratedRent(monNum+mntNum, c.startDate, c.endDate, ms);
+          }
+          cm++;
+          if(cm > 12) { cm=1; cy++; }
+        }
+      }
+      
+      let totalPaidAcc = 0;
+      paidTxs.forEach(t => {
+        if (t.date >= (c.startDate||'2000-01-01')) {
+          if (t.category === 'inc_dep_rent') {
+            const depAmount = parseInt(c.deposit||0) * 10000;
+            totalPaidAcc += Math.max(0, t.income - depAmount);
+          } else {
+            totalPaidAcc += t.income;
+          }
+        }
+      });
+      
+      const totalDisp = `<span style="color:var(--green);font-weight:800;">${formatMoney(totalPaidAcc)}</span> <span style="color:var(--dim);font-size:0.8rem;">/ ${formatMoney(totalExpected)}</span>`;
+      
       tbd.innerHTML += `<tr onclick="openContractModal('${id}')" style="${isPrev ? 'background:rgba(255,255,255,0.02);' : ''}">
         <td style="font-weight:800; opacity:${isPrev?0.5:1};">${id}</td>
         <td style="font-weight:700;">${nm}</td>
         <td class="td-right">${depStr}</td>
         <td class="td-right" style="font-weight:700;">${dispReq}</td>
+        <td class="td-center" style="color:var(--dim); font-size:0.85rem;">${lastPaidDate}</td>
+        <td class="td-right">${totalDisp}</td>
         <td class="td-center" onclick="event.stopPropagation();"><input type="text" value="${pastUnpaidStr}" placeholder="기존 미납액" style="width:110px; padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:white; text-align:right;" onchange="updateRentPastUnpaid('${id}', this.value, '${c.id}')"></td>
         <td class="td-center" onclick="event.stopPropagation();"><input type="checkbox" class="rent-chk" ${isPaid ? 'checked' : ''} onchange="toggleRentPaid('${id}', '${c.id}', event)"></td>
         <td class="td-center">${memo}</td>
@@ -2429,7 +2482,7 @@ function exportStatusExcel() {
 
   ALL_ROOMS.forEach(id => {
     const room = appData.rooms[id] || {};
-    const c = room.current || {};
+    const c = getPrimaryContract(room) || {};
     const st = getStatus(room);
     rows.push([
       id+'호', c.name||'공실', c.ssn||'', c.phone||'',
@@ -2442,7 +2495,6 @@ function exportStatusExcel() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [8,12,16,14,10,8,8,12,12,12,8,20].map(w=>({wch:w}));
-  // Header styling
   const hstyle = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'7B5C00'}},alignment:{horizontal:'center'}};
   for (let c=0; c<hdrs.length; c++) {
     const ref = XLSX.utils.encode_cell({r:0,c});
@@ -2486,18 +2538,18 @@ function exportTaxExcel() {
 
   ALL_ROOMS.forEach(id => {
     const room = appData.rooms[id] || {};
-    const contracts = [];
+    const contracts = room.contracts || [];
 
-    const c = room.current;
-    if (c && c.name && overlaps(c.startDate, c.endDate)) {
-      const [cs, ce] = clip(c.startDate, c.endDate);
-      contracts.push(Object.assign({}, c, { type:'현재계약', cs: cs, ce: ce, origS: c.startDate, origE: c.endDate }));
-    }
-    const p = room.previous;
-    if (p && p.name && overlaps(p.startDate, p.endDate)) {
-      const [ps, pe] = clip(p.startDate, p.endDate);
-      contracts.push(Object.assign({}, p, { type:'직전계약', cs: ps, ce: pe, origS: p.startDate, origE: p.endDate }));
-    }
+    contracts.forEach((c, idx) => {
+      if (c && c.name && overlaps(c.startDate, c.endDate)) {
+        const [cs, ce] = clip(c.startDate, c.endDate);
+        const typeStr = (idx === 0) ? '현재계약' : '과거계약';
+        allRows.push([
+          id+'호', c.name, c.ssn||'', c.deposit||0, c.monthly||0, c.maint||0,
+          cs, ce, typeStr, c.memo||''
+        ]);
+      }
+    });
 
     if (!contracts.length) {
       allRows.push([id+'호','공실','','','','',fmtDate(`${ty}-01-01`),fmtDate(`${ty}-12-31`),'공실','']);
@@ -3218,18 +3270,18 @@ function matchRoomForRent(desc) {
   if (!desc) return '';
   for (let id of ALL_ROOMS) {
     const room = appData.rooms[id];
-    if(!room) continue;
-    const c = room.current || {};
+    if(!room || !room.contracts) continue;
     
-    // Exact word boundary match for room number to prevent 1305 matching 305
     const regex = new RegExp("(?:^|[^\\d])" + id + "(?:[^\\d]|$)");
     if (regex.test(desc)) return id;
     
-    if (c.name && desc.indexOf(c.name) > -1) return id;
-    if (c.memo) {
-      const words = c.memo.split(/[\s,]+/);
-      for (let w of words) {
-        if (w.length >= 2 && desc.indexOf(w) > -1) return id;
+    for (let c of room.contracts) {
+      if (c.name && desc.indexOf(c.name) > -1) return id;
+      if (c.memo) {
+        const words = c.memo.split(/[\s,]+/);
+        for (let w of words) {
+          if (w.length >= 2 && desc.indexOf(w) > -1) return id;
+        }
       }
     }
   }
@@ -3249,102 +3301,118 @@ function guessFromHistory(desc, isIncome) {
 }
 
 async function importTxExcelData(e) {
-  const file = e.target.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async function(evt) {
-    try {
-      const data = new Uint8Array(evt.target.result);
-      const wb = XLSX.read(data, {type:'array'});
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(ws, {header:1});
-      
-      let hdrIdx = -1;
-      for(let i=0; i<Math.min(15, rows.length); i++) {
-        if(rows[i].some(function(c){ return typeof c==='string' && (c.indexOf('맡기신')>-1 || c.indexOf('찾으신')>-1 || c.indexOf('수입')>-1 || c.indexOf('지출')>-1 || c.indexOf('거래내용')>-1 || c.indexOf('적요')>-1); })) {
-          hdrIdx = i; break;
-        }
-      }
-      if(hdrIdx === -1) { alert('통장내역 엑셀 양식을 인식할 수 없습니다. (맡기신금액, 찾으신금액, 거래내용 등이 필요합니다)'); e.target.value=''; return; }
-      
-      const hdrs = rows[hdrIdx];
-      let dtCol=-1, incCol=-1, expCol=-1, balCol=-1, descCol=-1, descCol2=-1;
-      
-      hdrs.forEach((h, idx) => {
-        if(typeof h !== 'string') return;
-        if(h.indexOf('날짜')>-1 || h.indexOf('일시')>-1 || h.indexOf('거래일')>-1) dtCol = idx;
-        else if(h.indexOf('맡기신')>-1 || h.indexOf('입금')>-1 || h.indexOf('수입')>-1) incCol = idx;
-        else if(h.indexOf('찾으신')>-1 || h.indexOf('출금')>-1 || h.indexOf('지출')>-1) expCol = idx;
-        else if(h.indexOf('잔액')>-1) balCol = idx;
-        else if(h.indexOf('기록사항')>-1 || h.indexOf('기록')>-1) descCol2 = idx;
-        else if(h.indexOf('내용')>-1 || h.indexOf('적요')>-1) descCol = idx;
-      });
-      
-      if (!appData.transactions) appData.transactions = [];
-      let added = 0;
-      
-      for(let i=hdrIdx+1; i<rows.length; i++) {
-        const r = rows[i];
-        if(!r || r.length === 0) continue;
-        let dt = r[dtCol], inc = r[incCol]||0, exp = r[expCol]||0, bal = r[balCol]||0;
-        let d1 = String(r[descCol]||'').trim();
-        let d2 = descCol2 !== -1 ? String(r[descCol2]||'').trim() : '';
-        let desc = d2 ? d2 : d1; // 기재내용(기록사항) 우선
-        
-        if(!dt || (inc===0 && exp===0)) continue;
-        
-        let dateStr = typeof dt==='number' ? parseExcelDate(dt) : String(dt).trim();
-        if(!dateStr) continue;
-        
-        // 날짜 정리
-        dateStr = dateStr.replace(/[^0-9-.\/]/g, ' ').trim().split(' ')[0].replace(/\//g,'-').replace(/\./g,'-');
-        
-        inc = parseInt(String(inc).replace(/[^0-9]/g,''))||0;
-        exp = parseInt(String(exp).replace(/[^0-9]/g,''))||0;
-        bal = parseInt(String(bal).replace(/[^0-9-]/g,''))||0;
-        
-        const isIncome = inc > 0;
-        let cat = '';
-        let matchedRoom = '';
-        
-        const hist = guessFromHistory(desc, isIncome);
-        if (hist) {
-          cat = hist.cat;
-          matchedRoom = hist.room;
-        } else {
-          cat = guessTxCategory(desc, isIncome);
-          if (cat === 'inc_rent' || cat === 'inc_deposit' || cat === 'exp_deposit') {
-            matchedRoom = matchRoomForRent(desc);
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+  
+  // 엑셀 업로드 전 연도 입력 팝업창
+  const defaultYear = new Date().getFullYear();
+  const yearStr = prompt(`업로드하실 ${files.length}개 파일의 기준 연도(4자리)를 확인해주세요.\n(엑셀 파일 내의 날짜에 연도가 생략된 경우 이 연도로 자동 설정됩니다)`, defaultYear);
+  if (yearStr === null) { e.target.value = ''; return; } // 취소
+  const inputYear = parseInt(yearStr) || defaultYear;
+  
+  if (!appData.transactions) appData.transactions = [];
+  let totalAdded = 0;
+  
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const wb = XLSX.read(data, {type:'array'});
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+          
+          let hdrIdx = -1;
+          for(let r=0; r<Math.min(15, rows.length); r++) {
+            if(rows[r] && rows[r].some && rows[r].some(function(c){ return typeof c==='string' && (c.indexOf('맡기신')>-1 || c.indexOf('찾으신')>-1 || c.indexOf('수입')>-1 || c.indexOf('지출')>-1 || c.indexOf('거래내용')>-1 || c.indexOf('적요')>-1); })) {
+              hdrIdx = r; break;
+            }
           }
+          if(hdrIdx === -1) { 
+            console.warn(file.name + ': 양식을 인식할 수 없습니다.'); 
+            resolve(); return; 
+          }
+          
+          const hdrs = rows[hdrIdx];
+          let dtCol=-1, incCol=-1, expCol=-1, balCol=-1, descCol=-1, descCol2=-1;
+          
+          hdrs.forEach((h, idx) => {
+            if(typeof h !== 'string') return;
+            if(h.indexOf('날짜')>-1 || h.indexOf('일시')>-1 || h.indexOf('거래일')>-1) dtCol = idx;
+            else if(h.indexOf('맡기신')>-1 || h.indexOf('입금')>-1 || h.indexOf('수입')>-1) incCol = idx;
+            else if(h.indexOf('찾으신')>-1 || h.indexOf('출금')>-1 || h.indexOf('지출')>-1) expCol = idx;
+            else if(h.indexOf('잔액')>-1) balCol = idx;
+            else if(h.indexOf('기록사항')>-1 || h.indexOf('기록')>-1) descCol2 = idx;
+            else if(h.indexOf('내용')>-1 || h.indexOf('적요')>-1) descCol = idx;
+          });
+          
+          let added = 0;
+          for(let r=hdrIdx+1; r<rows.length; r++) {
+            const rowData = rows[r];
+            if(!rowData || rowData.length === 0) continue;
+            let dt = rowData[dtCol], inc = rowData[incCol]||0, exp = rowData[expCol]||0, bal = rowData[balCol]||0;
+            let d1 = String(rowData[descCol]||'').trim();
+            let d2 = descCol2 !== -1 ? String(rowData[descCol2]||'').trim() : '';
+            let desc = d2 ? d2 : d1; // 기재내용(기록사항) 우선
+            
+            if(!dt || (inc===0 && exp===0)) continue;
+            
+            let dateStr = typeof dt==='number' ? parseExcelDate(dt) : String(dt).trim();
+            if(!dateStr) dateStr = String(dt).trim(); // fallback
+            if(!dateStr) continue;
+            
+            dateStr = String(dateStr).replace(/[^0-9-.\/]/g, ' ').trim().split(' ')[0].replace(/\//g,'-').replace(/\./g,'-');
+            
+            if (dateStr.split('-').length === 2) {
+              dateStr = `${inputYear}-${dateStr}`;
+            }
+            
+            inc = parseInt(String(inc).replace(/[^0-9]/g,''))||0;
+            exp = parseInt(String(exp).replace(/[^0-9]/g,''))||0;
+            bal = parseInt(String(bal).replace(/[^0-9-]/g,''))||0;
+            
+            const isIncome = inc > 0;
+            let cat = '';
+            let matchedRoom = '';
+            
+            const hist = guessFromHistory(desc, isIncome);
+            if (hist) {
+              cat = hist.cat;
+              matchedRoom = hist.room;
+            } else {
+              cat = guessTxCategory(desc, isIncome);
+              if (cat === 'inc_rent' || cat === 'inc_deposit' || cat === 'exp_deposit') {
+                matchedRoom = matchRoomForRent(desc);
+              }
+            }
+            
+            appData.transactions.push({
+              id: genId(), date: dateStr, desc: desc, income: inc, expense: exp, balance: bal, category: cat, matchedRoom: matchedRoom
+            });
+            added++;
+          }
+          totalAdded += added;
+        } catch(err) {
+          console.error('Error parsing file ' + file.name, err);
         }
-        
-        appData.transactions.push({
-          id: genId(),
-          date: dateStr,
-          desc: desc,
-          income: inc,
-          expense: exp,
-          balance: bal,
-          category: cat,
-          matchedRoom: matchedRoom
-        });
-        added++;
-      }
-      
-      if(added > 0) {
-        appData.transactions.sort((a,b) => a.date.localeCompare(b.date));
-        await saveData();
-        refreshUI();
-        alert(`✅ ${added}건의 통장내역이 성공적으로 업로드 되었습니다.`);
-      } else {
-        alert('업로드할 내역을 찾지 못했습니다.');
-      }
-    } catch(err) {
-      console.error(err);
-      alert('엑셀 파일을 읽는 중 오류가 발생했습니다.');
-    }
-    e.target.value = '';
-  };
-  reader.readAsArrayBuffer(file);
+        resolve();
+      };
+      reader.onerror = resolve;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+  
+  if(totalAdded > 0) {
+    appData.transactions.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    await saveData();
+    refreshUI();
+    alert(`✅ 총 ${totalAdded}건의 통장내역이 엑셀에서 성공적으로 업로드 되었습니다.`);
+  } else {
+    alert('업로드할 내역을 찾지 못했습니다.');
+  }
+  e.target.value = '';
 }
 
 function renderTxGrid() {
