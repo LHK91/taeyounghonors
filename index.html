@@ -38,7 +38,9 @@ body{
   font-family:'Outfit','Noto Sans KR',sans-serif;
   min-height:100vh;
   overflow-x:hidden;
+  user-select:none; -webkit-user-select:none; -moz-user-select:none; /* Security: Text selection disabled */
 }
+input, textarea, select { user-select:auto; -webkit-user-select:auto; -moz-user-select:auto; }
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-track{background:rgba(255,255,255,0.02);}
 ::-webkit-scrollbar-thumb{background:rgba(255,211,42,0.3);border-radius:10px;}
@@ -241,7 +243,7 @@ header{
 .room-table-wrap { overflow-x: auto; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); }
 .room-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
 .room-table th { background: rgba(255,255,255,0.03); color: var(--dim); padding: 12px; font-weight: 700; border-bottom: 1px solid var(--border); white-space: nowrap; }
-.room-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.room-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; white-space: nowrap; }
 .room-table tr:last-child td { border-bottom: none; }
 .room-table tr:hover td { background: rgba(255,255,255,0.05); }
 .room-table tr { cursor: pointer; transition: background 0.2s; }
@@ -808,7 +810,7 @@ header{
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
       <div style="font-size:1.15rem; font-weight:900; color:var(--gold); display:flex; align-items:center; gap:8px; margin:0;">
         📋 호실별 계약 현황
-        <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:#00d2ff;" onclick="openContractModal(ALL_ROOMS[0])">+ 수기 계약 등록</button>
+        <button class="btn" id="btnManualContract" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(0,210,255,0.1); border:1px solid rgba(0,210,255,0.3); color:#00d2ff;" onclick="openContractModal(ALL_ROOMS[0])">+ 수기 계약 등록</button>
       </div>
       <div style="display:flex; align-items:center; gap:10px;">
         <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">조회 시점</label>
@@ -823,6 +825,28 @@ header{
     <div class="alert-banner" id="alertBanner">
       <div class="alert-title"><span>⚠️</span> 즉시 확인 필요</div>
       <div class="alert-items" id="alertItems"></div>
+    </div>
+    
+    <!-- Agent Banner (Viewer Mode Only) -->
+    <div class="alert-banner" id="agentBanner" style="display:none;">
+      <div class="alert-title" style="margin-bottom:10px;"><span>🏢</span> 태영아너스 매물장</div>
+      <div class="room-table-wrap">
+        <table class="room-table" style="min-width:600px;">
+          <thead>
+            <tr>
+              <th>호실</th>
+              <th>상태</th>
+              <th>임차인</th>
+              <th>연락처</th>
+              <th class="td-right">보증금(원)</th>
+              <th class="td-right">월세합산(원)</th>
+              <th>계약 만료일</th>
+              <th>중개사 메모</th>
+            </tr>
+          </thead>
+          <tbody id="agentItems"></tbody>
+        </table>
+      </div>
     </div>
     <!-- Stats -->
     <div class="stats-bar">
@@ -949,9 +973,9 @@ header{
 
       <div class="fsec" id="cfFinSec">💰 계약 조건 <span style="font-size:0.73rem;color:var(--red);">[관리자 전용]</span></div>
       <div class="fg3" id="cfFinRow">
-        <div class="frow"><label>보증금 (만원)</label><input id="cf_deposit" type="number" min="0" placeholder="0"></div>
-        <div class="frow"><label>월세 (만원)</label><input id="cf_monthly" type="number" min="0" placeholder="0"></div>
-        <div class="frow"><label>관리비 (만원)</label><input id="cf_maint" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>보증금 (원)</label><input id="cf_deposit" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>월세 (원)</label><input id="cf_monthly" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>관리비 (원)</label><input id="cf_maint" type="number" min="0" placeholder="0"></div>
       </div>
 
       <div class="fsec">📅 계약 기간</div>
@@ -983,6 +1007,7 @@ header{
         </select>
       </div>
       <div class="frow"><label>메모 / 특이사항</label><textarea id="cf_memo" placeholder="관리 메모, 특이사항..."></textarea></div>
+      <div class="frow"><label style="color:var(--gold);">중개사 메모</label><textarea id="cf_agentMemo" placeholder="열람모드에서 중개사가 남긴 메모가 표시/저장됩니다."></textarea></div>
     </div>
 
     <!-- Previous Contract -->
@@ -996,9 +1021,9 @@ header{
       </div>
       <div class="frow"><label>주민등록번호</label><input id="pf_ssn" placeholder="000000-0000000"></div>
       <div class="fg3">
-        <div class="frow"><label>보증금 (만원)</label><input id="pf_deposit" type="number" min="0" placeholder="0"></div>
-        <div class="frow"><label>월세 (만원)</label><input id="pf_monthly" type="number" min="0" placeholder="0"></div>
-        <div class="frow"><label>관리비 (만원)</label><input id="pf_maint" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>보증금 (원)</label><input id="pf_deposit" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>월세 (원)</label><input id="pf_monthly" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>관리비 (원)</label><input id="pf_maint" type="number" min="0" placeholder="0"></div>
       </div>
       <div class="fg2">
         <div class="frow"><label>계약 시작일</label><input id="pf_sdate" type="date"></div>
@@ -1019,7 +1044,7 @@ header{
       </div>
       <div class="fg2">
         <div class="frow"><label>증권 번호</label><input id="if_no" placeholder="증권번호"></div>
-        <div class="frow"><label>보험금액 (만원)</label><input id="if_amt" type="number" min="0" placeholder="0"></div>
+        <div class="frow"><label>가입금액 (원)</label><input id="if_amt" type="number" min="0" placeholder="0"></div>
       </div>
       <div class="frow"><label>메모</label><textarea id="if_memo" placeholder="보증보험 관련 메모..."></textarea></div>
     </div>
@@ -1027,6 +1052,34 @@ header{
     <div class="form-actions">
       <button class="btn-cancel" onclick="closeContractModal()">닫기</button>
       <button class="btn-save" id="cmSaveBtn" onclick="saveContract()">💾 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== AGENT MODAL ====== -->
+<div class="modal-overlay" id="agentModal" onclick="closeAgentModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:400px;">
+    <div class="modal-header">
+      <h2 id="agentModalTitle">매물 상태 및 메모 변경</h2>
+      <button class="modal-close" onclick="closeAgentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="frow">
+        <label>중개 진행 상태</label>
+        <select id="agent_status">
+          <option value="expire_expected">만기종료예정 (매물)</option>
+          <option value="extend_expected">연장예정</option>
+          <option value="pre_contract">가계약완료</option>
+        </select>
+      </div>
+      <div class="frow" style="margin-top:10px;">
+        <label>중개사 메모</label>
+        <textarea id="agent_memo" placeholder="일정, 특이사항 등을 기록하세요..." style="height:100px;"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" style="background:var(--surface);" onclick="closeAgentModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveAgentModal()">저장</button>
     </div>
   </div>
 </div>
@@ -1251,13 +1304,6 @@ header{
 <div class="modal-overlay" id="settingsModal">
   <div class="modal-box narrow">
     <div class="modal-title">⚙️ 설정</div>
-    <div class="settings-block">
-      <div class="settings-lbl">👁 공유 비밀번호 변경 (뷰어용 PW)</div>
-      <div class="fg2">
-        <div class="frow"><label>새 비밀번호</label><input id="newVPw" type="password" placeholder="새 공유 PW"></div>
-        <div class="frow"><label>확인</label><input id="newVPwC" type="password" placeholder="다시 입력"></div>
-      </div>
-      <button onclick="changeViewerPw()" class="btn btn-green-o" style="width:100%;justify-content:center;margin-top:4px;">🔑 공유 PW 변경</button>
     </div>
     <div class="settings-block">
       <div class="settings-lbl">🔥 Firebase 재설정</div>
@@ -1298,8 +1344,8 @@ for (let fi=0; fi<FLOORS.length; fi++) {
   }
 }
 
-const ADMIN_PW_RAW = '3876';
-const VIEWER_PW_DEF = '0596';
+const ADMIN_PW_RAW = '0359';
+const VIEWER_PW_DEF = '3876';
 
 const CAT_COLOR = {
   manual:'#00d2ff', contract_report:'#ffa502', insurance:'#9d50bb',
@@ -1351,12 +1397,11 @@ function init() {
   adminHash = hashPw(ADMIN_PW_RAW);
   viewerHash = hashPw(VIEWER_PW_DEF);
 
-  // ② 코드 기준 viewerPwHash가 로컴에 저장된 것이 있으면 우선 사용
+  // ② 로컬 데이터 로딩
   const local = getLocal('ty_local');
   if (local) {
     try {
       const parsed = JSON.parse(local);
-      if (parsed.settings?.viewerPwHash) viewerHash = parsed.settings.viewerPwHash;
       appData = parsed;
     } catch(e) {}
   }
@@ -1431,17 +1476,7 @@ function setAuthReady() {
 }
 
 async function afterDataLoad() {
-  // Firebase에서 널어온 viewerPwHash가 있으면 업데이트
-  const fbHash = appData.settings ? appData.settings.viewerPwHash : undefined;
-  if (fbHash && fbHash !== viewerHash) {
-    viewerHash = fbHash; // Firebase의 변경된 PW 리프레시
-  }
-  if (!fbHash) {
-    // 신규 DB일 경우 현재 viewerHash 저장
-    if (!appData.settings) appData.settings = {};
-    appData.settings.viewerPwHash = viewerHash;
-    await saveData();
-  }
+  // Firebase의 viewerPwHash 무시 (하드코딩된 VIEWER_PW_DEF 사용)
   migrateContractsData();
   setSyncStatus('synced');
   if (authMode) refreshUI();
@@ -1452,7 +1487,7 @@ async function loadLocal() {
   if (d) {
     try {
       const parsed = JSON.parse(d);
-      if (parsed.settings && parsed.settings.viewerPwHash) viewerHash = parsed.settings.viewerPwHash;
+      // viewerPwHash 덮어쓰기 로직 제거 (항상 하드코딩된 VIEWER_PW_DEF 사용)
       appData = parsed;
     } catch(e) {}
   }
@@ -1580,6 +1615,25 @@ function enterApp() {
   document.getElementById('mainApp').style.display = 'block';
   document.getElementById('adminCtrl').style.display = authMode==='admin' ? 'flex' : 'none';
   document.getElementById('viewerInd').style.display  = authMode==='viewer' ? 'block' : 'none';
+  
+  if (authMode === 'viewer') {
+    if (el('tabS')) el('tabS').style.display = 'none';
+    if (el('tabR')) el('tabR').style.display = 'none';
+    if (el('tabT')) el('tabT').style.display = 'none';
+    if (el('tabP')) el('tabP').style.display = 'none';
+    if (el('btnManualContract')) el('btnManualContract').style.display = 'none';
+    if (el('alertBanner')) el('alertBanner').style.display = 'none';
+    if (el('agentBanner')) el('agentBanner').style.display = 'block';
+    switchTab('contract');
+  } else {
+    if (el('tabS')) el('tabS').style.display = '';
+    if (el('tabR')) el('tabR').style.display = '';
+    if (el('tabT')) el('tabT').style.display = '';
+    if (el('tabP')) el('tabP').style.display = '';
+    if (el('alertBanner')) el('alertBanner').style.display = 'flex';
+    if (el('agentBanner')) el('agentBanner').style.display = 'none';
+  }
+
   refreshUI();
 }
 function logout() {
@@ -1590,17 +1644,7 @@ function logout() {
   const ov = document.getElementById('authOverlay');
   ov.style.opacity = '1'; ov.style.display = 'flex';
 }
-async function changeViewerPw() {
-  const pw = v('newVPw'), pc = v('newVPwC');
-  if (!pw) { alert('새 비밀번호를 입력하세요'); return; }
-  if (pw !== pc) { alert('비밀번호가 일치하지 않습니다'); return; }
-  viewerHash = hashPw(pw);
-  appData.settings.viewerPwHash = viewerHash;
-  await saveData();
-  document.getElementById('newVPw').value = '';
-  document.getElementById('newVPwC').value = '';
-  alert('✅ 공유 비밀번호가 변경되었습니다.');
-}
+// changeViewerPw removed for security reasons
 
 // ──────────── UTILS ────────────
 function v(id){ const el = document.getElementById(id); return el && el.value ? el.value.trim() : ''; }
@@ -1822,6 +1866,7 @@ function refreshUI() {
   renderPnl();
   updateStats();
   renderAlertBanner();
+  if(typeof renderAgentBanner === 'function') renderAgentBanner();
   renderCalendar();
   renderMiniCal();
   renderUpcoming();
@@ -1911,12 +1956,11 @@ function renderRoomGrid() {
         <th onclick="setSort('status')" style="cursor:pointer;" title="클릭하여 정렬">상태 ${getSortArrow('status')}</th>
         <th onclick="setSort('name')" style="cursor:pointer;" title="클릭하여 정렬">임차인 ${getSortArrow('name')}</th>
         <th class="td-right">보증금</th>
-        <th class="td-right">월세</th>
-        <th class="td-right">관리비</th>
+        ${authMode === 'viewer' ? '<th class="td-right">월세+관리비</th>' : '<th class="td-right">월세</th><th class="td-right">관리비</th>'}
         <th onclick="setSort('sdate')" style="cursor:pointer;" title="클릭하여 정렬">계약 시작일 ${getSortArrow('sdate')}</th>
         <th onclick="setSort('edate')" style="cursor:pointer;" title="클릭하여 정렬">계약 만기일 ${getSortArrow('edate')}</th>
-        <th class="td-center">계약신고</th>
-        <th>비고</th>
+        ${authMode === 'viewer' ? '' : '<th class="td-center">계약신고</th>'}
+        ${authMode === 'viewer' ? '' : '<th>비고</th>'}
       </tr>
     </thead>
     <tbody>`;
@@ -1958,17 +2002,19 @@ function renderRoomGrid() {
       else repHtml = `<span style="color:var(--red);font-weight:700; background:rgba(255,71,87,0.15); padding:3px 6px; border-radius:4px; cursor:pointer;" onclick="toggleReport('${id}', '${c.id}', event)">❌ 미신고</span>`;
     }
     
-    html += `<tr onclick="openContractModal('${id}')">
+    const rentSumNum = (mNum + mntNum);
+    const rentSumStr = rentSumNum > 0 ? formatMoney(rentSumNum.toString()) : '-';
+
+    html += `<tr ${authMode === 'viewer' ? '' : `onclick="openContractModal('${id}')"`} style="${authMode === 'viewer' ? 'cursor:default;' : ''}">
       <td style="font-weight:800;color:var(--text);">${id}</td>
       <td><span class="rt-badge ${bcls}">${blbl}</span></td>
       <td style="font-weight:700;">${nm}</td>
       <td class="td-right">${dep}</td>
-      <td class="td-right">${mon}</td>
-      <td class="td-right">${mnt}</td>
+      ${authMode === 'viewer' ? `<td class="td-right">${rentSumStr}</td>` : `<td class="td-right">${mon}</td><td class="td-right">${mnt}</td>`}
       <td style="white-space:nowrap; font-weight:600; color:var(--text);">${dStart}</td>
       <td style="white-space:nowrap; font-weight:600; color:var(--text);">${dEnd}</td>
-      <td class="td-center">${repHtml}</td>
-      <td class="td-center">${memo}</td>
+      ${authMode === 'viewer' ? '' : `<td class="td-center">${repHtml}</td>`}
+      ${authMode === 'viewer' ? '' : `<td class="td-center">${memo}</td>`}
     </tr>`;
   });
   
@@ -2113,10 +2159,11 @@ function renderRentGrid() {
       }
       
       let totalPaidAcc = 0;
+      const endLimit = c.endDate ? c.endDate.substring(0,7)+'-31' : '2099-12-31';
       paidTxs.forEach(t => {
-        if (t.date >= (c.startDate||'2000-01-01')) {
+        if (t.date >= (c.startDate||'2000-01-01') && t.date <= endLimit) {
           if (t.category === 'inc_dep_rent') {
-            const depAmount = parseInt(c.deposit||0) * 10000;
+            const depAmount = parseInt(c.deposit||0);
             totalPaidAcc += Math.max(0, t.income - depAmount);
           } else {
             totalPaidAcc += t.income;
@@ -2155,7 +2202,7 @@ function applyExcelStyle(ws) {
       if(!cell.s) cell.s = {};
       cell.s.font = { name: "맑은 고딕", sz: 11 };
       cell.s.alignment = { vertical: "center", horizontal: "center" };
-      cell.s.border = { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} };
+      cell.s.border = { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin" } };
       if(R === 0) {
         cell.s.fill = { fgColor: { rgb: "E2EFDA" } };
         cell.s.font.bold = true;
@@ -2362,7 +2409,7 @@ function openContractModal(roomId) {
 
   const rdonly = !isAdmin;
   ['cf_name','cf_phone','cf_ssn','cf_deposit','cf_monthly','cf_maint',
-   'cf_cdate','cf_sdate','cf_edate','cf_rdate','cf_memo',
+   'cf_cdate','cf_sdate','cf_edate','cf_rdate','cf_memo','cf_agentMemo',
    'if_exp','if_co','if_no','if_amt','if_memo'
   ].forEach(id => { el(id).readOnly = rdonly; });
   el('cf_reportDone').disabled = rdonly;
@@ -2397,6 +2444,7 @@ function loadContractForm(cid) {
   el('cf_rdate').value = target.reportDate || '';
   el('cf_renewal').value = target.renewalStatus || '';
   el('cf_memo').value = target.memo || '';
+  el('cf_agentMemo').value = target.agentMemo || '';
   updateReportDeadline();
 }
 
@@ -2445,6 +2493,7 @@ function copyAndNewContract() {
     sel.value = newC.id;
   }
   loadContractForm(newC.id);
+
   alert('기존 세입자의 정보를 성공적으로 불러왔습니다.\n월세/관리비, 계약기간 등을 새롭게 편집하신 후 꼭 [저장]을 눌러주세요.');
 }
 
@@ -2511,7 +2560,7 @@ async function saveContract() {
   target.deposit = v('cf_deposit'); target.monthly = v('cf_monthly'); target.maint = v('cf_maint');
   target.contractDate = v('cf_cdate'); target.startDate = v('cf_sdate'); target.endDate = v('cf_edate');
   target.reportDone = el('cf_reportDone').checked; target.reportDate = v('cf_rdate');
-  target.renewalStatus = v('cf_renewal'); target.memo = v('cf_memo');
+  target.renewalStatus = v('cf_renewal'); target.memo = v('cf_memo'); target.agentMemo = v('cf_agentMemo');
 
   room.insurance = {
     expiryDate: v('if_exp'), company: v('if_co'),
@@ -2588,7 +2637,7 @@ function exportTaxExcel() {
   const yS = new Date(`${ty}-01-01`);
   const yE = new Date(`${ty}-12-31`);
 
-  const hdrs = ['호실','성명','주민등록번호','보증금(만원)','월세(만원)','관리비(만원)','계약시작일(연도내)','계약만료일(연도내)','계약구분','비고'];
+  const hdrs = ['호실','성명','주민등록번호','보증금(원)','월세(원)','관리비(원)','계약시작일(연도내)','계약만료일(연도내)','계약구분','비고'];
   const allRows = [hdrs];
 
   function overlaps(sDate, eDate) {
@@ -3695,6 +3744,128 @@ function renderPnl() {
 }
 
 
+
+// ====== AGENT BANNER / MODAL LOGIC ======
+function renderAgentBanner() {
+  const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+  const tbody = el('agentItems');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  const sorted = getSortedRooms();
+  sorted.forEach(id => {
+    const room = appData.rooms[id] || {};
+    const c = getPrimaryContract(room, targetMonthStr);
+    if (!c || !c.name) return;
+    
+    // Admin decides it's an "expire_expected" (renewalStatus === 'expire' and endDate in future)
+    // BUT we shouldn't show it if they already actually changed the status to something else like 'active' or 'extend'.
+    // If Admin changed renewalStatus to anything other than 'expire', it is no longer a property for rent.
+    if (c.renewalStatus !== 'expire') return; 
+    
+    // Check if it's still in the future
+    const s = getStatus(room, targetMonthStr);
+    if (s === 'vacant' || s === 'upcoming') return; // Vacant or new contract, not this one
+    
+    // Check if a future contract already exists for this room
+    const hasNextContract = (room.contracts || []).some(otherC => {
+      if (otherC.id === c.id) return false;
+      const oSDate = otherC.startDate ? new Date(otherC.startDate) : new Date('2000-01-01');
+      return oSDate > new Date(c.startDate || '2000-01-01');
+    });
+    if (hasNextContract) return;
+    
+    const ast = c.agentStatus || 'expire_expected';
+    const amemo = c.agentMemo || '';
+    
+    let bcls = 'rt-expire_expected';
+    let blbl = '만기종료예정';
+    if (ast === 'extend_expected') { bcls = 'rt-extend'; blbl = '연장예정'; }
+    if (ast === 'pre_contract') { bcls = 'rt-active'; blbl = '가계약완료'; }
+    
+    const isStrike = (ast === 'extend_expected' || ast === 'pre_contract');
+    const trStyle = isStrike ? 'text-decoration: line-through; opacity: 0.6; cursor: pointer;' : 'cursor: pointer;';
+    
+    const mNum = parseInt(String(c.monthly||'0').replace(/[^0-9-]/g, ''), 10) || 0;
+    const mntNum = parseInt(String(c.maint||'0').replace(/[^0-9-]/g, ''), 10) || 0;
+    const rentSumNum = mNum + mntNum;
+    const rentSumStr = rentSumNum > 0 ? formatMoney(rentSumNum.toString()) : '-';
+    
+    const dep = c.deposit ? formatMoney(c.deposit) : '-';
+    const dEnd = c.endDate ? fmtDate(c.endDate) : '-';
+    
+    tbody.innerHTML += `<tr onclick="openAgentModal('${id}')" style="${trStyle}">
+      <td style="font-weight:800;">${id}</td>
+      <td><span class="rt-badge ${bcls}">${blbl}</span></td>
+      <td>${c.name}</td>
+      <td>${c.phone || '-'}</td>
+      <td class="td-right">${dep}</td>
+      <td class="td-right">${rentSumStr}</td>
+      <td>${dEnd}</td>
+      <td>${amemo}</td>
+    </tr>`;
+  });
+}
+
+let curAgentRoom = null;
+function openAgentModal(roomId) {
+  if (authMode !== 'viewer') return;
+  curAgentRoom = roomId;
+  const room = appData.rooms[roomId] || {};
+  const c = getPrimaryContract(room, el('mainMonth').value);
+  if (!c) return;
+  
+  el('agentModalTitle').textContent = `${roomId}호 매물 상태 변경`;
+  el('agent_status').value = c.agentStatus || 'expire_expected';
+  el('agent_memo').value = c.agentMemo || '';
+  
+  el('agentModal').style.display = 'flex';
+  setTimeout(() => el('agentModal').style.opacity = '1', 10);
+}
+
+function closeAgentModal(e) {
+  if (e && e.target.id !== 'agentModal') return;
+  const ov = el('agentModal');
+  ov.style.opacity = '0';
+  setTimeout(() => { ov.style.display = 'none'; curAgentRoom = null; }, 250);
+}
+
+function saveAgentModal() {
+  if (!curAgentRoom) return;
+  const room = appData.rooms[curAgentRoom];
+  const c = getPrimaryContract(room, el('mainMonth').value);
+  if (c) {
+    c.agentStatus = el('agent_status').value;
+    c.agentMemo = el('agent_memo').value;
+    saveData();
+    refreshUI();
+  }
+  closeAgentModal();
+}
+
+// ====== SECURITY MEASURES ======
+// Disable Right Click
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// Disable F12, Ctrl+Shift+I, Ctrl+U
+document.addEventListener('keydown', e => {
+  if (e.key === 'F12' || 
+     (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) ||
+     (e.ctrlKey && (e.key === 'U' || e.key === 'u'))) {
+    e.preventDefault();
+  }
+});
+
+// Anti-Debugging Loop
+setInterval(() => {
+  const before = new Date().getTime();
+  debugger;
+  const after = new Date().getTime();
+  if (after - before > 100) {
+    // Debugger was paused
+    document.body.innerHTML = '<h1 style="color:white; text-align:center; margin-top:20vh;">접근이 제한되었습니다.</h1>';
+  }
+}, 2000);
 
 // ──────────── STARTUP ────────────
 window.addEventListener('load', init);
