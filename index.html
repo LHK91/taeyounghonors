@@ -925,6 +925,7 @@ header{
       <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
         <select id="contractSelector" onchange="loadContractForm(this.value)" style="padding:4px; border-radius:4px; font-size:0.85rem; background:rgba(255,255,255,0.1); color:white; border:none; outline:none; max-width: 150px; text-overflow:ellipsis;"></select>
         <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.75rem; white-space:nowrap;" onclick="addNewContract()">+ 새 임차인 추가</button>
+        <button class="btn btn-blue-o" style="padding:4px 8px; font-size:0.75rem; white-space:nowrap; border-color:rgba(0,210,255,0.3); color:#00d2ff;" onclick="copyAndNewContract()">+ 재계약(복사)</button>
         <button class="btn btn-outline" style="padding:4px 8px; font-size:0.75rem; color:var(--red); border-color:rgba(255,71,87,0.3); white-space:nowrap;" onclick="delContract()">삭제</button>
       </div>
     </div>
@@ -1953,8 +1954,8 @@ function renderRoomGrid() {
     // Report
     let repHtml = '-';
     if (s !== 'vacant') {
-      if (c.reportDone) repHtml = `<span style="color:var(--green);font-weight:700; background:rgba(46,213,115,0.15); padding:3px 6px; border-radius:4px;">✅ 신고완료</span>`;
-      else repHtml = `<span style="color:var(--red);font-weight:700; background:rgba(255,71,87,0.15); padding:3px 6px; border-radius:4px;">❌ 미신고</span>`;
+      if (c.reportDone) repHtml = `<span style="color:var(--green);font-weight:700; background:rgba(46,213,115,0.15); padding:3px 6px; border-radius:4px; cursor:pointer;" onclick="toggleReport('${id}', '${c.id}', event)">✅ 신고완료</span>`;
+      else repHtml = `<span style="color:var(--red);font-weight:700; background:rgba(255,71,87,0.15); padding:3px 6px; border-radius:4px; cursor:pointer;" onclick="toggleReport('${id}', '${c.id}', event)">❌ 미신고</span>`;
     }
     
     html += `<tr onclick="openContractModal('${id}')">
@@ -2418,6 +2419,48 @@ function addNewContract() {
     sel.value = newC.id;
   }
   loadContractForm(newC.id);
+}
+
+function copyAndNewContract() {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const room = appData.rooms[curRoomId];
+  if (!room || !room.contracts) return;
+  const curC = room.contracts.find(x => x.id === curContractId) || {};
+  const newC = {
+    id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+    name: curC.name || '새 임차인',
+    phone: curC.phone || '',
+    ssn: curC.ssn || '',
+    deposit: curC.deposit || '',
+    monthly: curC.monthly || '',
+    maint: curC.maint || '',
+    startDate: curC.endDate ? curC.endDate : getCurrMonthStr() + '-01'
+  };
+  room.contracts.push(newC);
+  room.contracts.sort((a,b) => (new Date(b.startDate||"1900-01-01")) - (new Date(a.startDate||"1900-01-01")));
+  
+  const sel = el('contractSelector');
+  if (sel) {
+    sel.innerHTML = room.contracts.map(c => `<option value="${c.id}">${c.startDate||'미지정'}~${c.endDate||'미지정'} ${c.name}</option>`).join('');
+    sel.value = newC.id;
+  }
+  loadContractForm(newC.id);
+  alert('기존 세입자의 정보를 성공적으로 불러왔습니다.\n월세/관리비, 계약기간 등을 새롭게 편집하신 후 꼭 [저장]을 눌러주세요.');
+}
+
+function toggleReport(roomId, contractId, e) {
+  e.stopPropagation();
+  if (authMode !== 'admin') {
+    alert('관리자 권한이 필요합니다.');
+    return;
+  }
+  const room = appData.rooms[roomId];
+  if (!room) return;
+  const c = room.contracts.find(x => x.id === contractId);
+  if (c) {
+    c.reportDone = !c.reportDone;
+    saveData().then(() => refreshUI());
+  }
 }
 
 function delContract() {
@@ -3190,7 +3233,11 @@ async function execBulkDelete() {
 
 // ──────────── MODAL CLOSE ON BG CLICK ────────────
 document.querySelectorAll('.modal-overlay').forEach(ov => {
-  ov.addEventListener('click', e => { if (e.target===ov) ov.classList.remove('open'); });
+  ov.addEventListener('click', e => { 
+    if (e.target === ov && ov.id !== 'contractModal') {
+      ov.classList.remove('open'); 
+    }
+  });
 });
 
 // ──────────── TRANSACTIONS & P&L ────────────
