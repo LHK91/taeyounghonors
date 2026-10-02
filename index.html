@@ -410,7 +410,7 @@ header{
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
 .cal-cell{
   background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);
-  border-radius:12px;height:116px;padding:7px;transition:all 0.2s;
+  border-radius:12px;min-height:116px;padding:7px;transition:all 0.2s;
   position:relative;cursor:pointer;overflow-y:auto;overflow-x:hidden;
 }
 .cal-cell::-webkit-scrollbar{width:3px;}
@@ -420,10 +420,19 @@ header{
 .cal-cell.other-month-cell{opacity:0.28;}
 .cal-cell.sunday-cell .cal-dn{color:var(--red);}
 .cal-cell.saturday-cell .cal-dn{color:#7ec8e3;}
-.cal-dn{font-size:0.8rem;font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
+.cal-dn{font-size:0.85rem;font-weight:700;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;}
 .today-badge{font-size:0.58rem;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1200;padding:2px 5px;border-radius:5px;font-weight:800;}
-.cal-ev{font-size:0.67rem;padding:2px 5px;border-radius:5px;margin-bottom:2px;font-weight:600;cursor:pointer;transition:opacity 0.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
+.cal-ev{font-size:0.75rem;padding:3px 5px;border-radius:5px;margin-bottom:3px;font-weight:600;cursor:pointer;transition:opacity 0.2s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}
 .cal-ev:hover{opacity:0.8;}
+
+@media(min-width:1024px){
+  .cal-cell { min-height:150px; }
+  .cal-dn { font-size:1rem; }
+  .cal-ev { font-size:0.85rem; padding:4px 8px; margin-bottom:4px; }
+}
+@media(min-width:1440px){
+  .cal-cell { min-height:180px; }
+}
 
 /* Mini Cal */
 .mini-cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
