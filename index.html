@@ -827,27 +827,7 @@ header{
       <div class="alert-items" id="alertItems"></div>
     </div>
     
-    <!-- Agent Banner (Viewer Mode Only) -->
-    <div class="alert-banner" id="agentBanner" style="display:none;">
-      <div class="alert-title" style="margin-bottom:10px;"><span>🏢</span> 태영아너스 매물장</div>
-      <div class="room-table-wrap">
-        <table class="room-table" style="min-width:600px;">
-          <thead>
-            <tr>
-              <th>호실</th>
-              <th>상태</th>
-              <th>임차인</th>
-              <th>연락처</th>
-              <th class="td-right">보증금(원)</th>
-              <th class="td-right">월세합산(원)</th>
-              <th>계약 만료일</th>
-              <th>중개사 메모</th>
-            </tr>
-          </thead>
-          <tbody id="agentItems"></tbody>
-        </table>
-      </div>
-    </div>
+
     <!-- Stats -->
     <div class="stats-bar">
       <div class="stat-card">
@@ -878,6 +858,27 @@ header{
 
   <!-- ===== SCHEDULE TAB ===== -->
   <div class="tab-content" id="scheduleTab">
+    <!-- Agent Banner (Viewer Mode Only) -->
+    <div class="alert-banner" id="agentBanner" style="display:none;">
+      <div class="alert-title" style="margin-bottom:10px;"><span>🏢</span> 태영아너스 매물장</div>
+      <div class="room-table-wrap">
+        <table class="room-table" style="min-width:600px;">
+          <thead>
+            <tr>
+              <th>호실</th>
+              <th>상태</th>
+              <th>임차인</th>
+              <th>연락처</th>
+              <th class="td-right">보증금(원)</th>
+              <th class="td-right">월세합산(원)</th>
+              <th>입주가능(만료)일</th>
+              <th>중개사 메모</th>
+            </tr>
+          </thead>
+          <tbody id="agentItems"></tbody>
+        </table>
+      </div>
+    </div>
     <!-- Schedule Alerts -->
     <div class="alert-banner" id="schedAlertBanner">
       <div class="alert-title"><span>⚠️</span> 3개월 이내 주의 일정</div>
@@ -1071,6 +1072,10 @@ header{
           <option value="extend_expected">연장예정</option>
           <option value="pre_contract">가계약완료</option>
         </select>
+      </div>
+      <div class="frow" style="margin-top:10px;">
+        <label>조율된 일정 (입주가능일)</label>
+        <input type="date" id="agent_date">
       </div>
       <div class="frow" style="margin-top:10px;">
         <label>중개사 메모</label>
@@ -1617,21 +1622,28 @@ function enterApp() {
   document.getElementById('viewerInd').style.display  = authMode==='viewer' ? 'block' : 'none';
   
   if (authMode === 'viewer') {
-    if (el('tabS')) el('tabS').style.display = 'none';
+    if (el('tabC')) el('tabC').style.display = 'none';
     if (el('tabR')) el('tabR').style.display = 'none';
     if (el('tabT')) el('tabT').style.display = 'none';
     if (el('tabP')) el('tabP').style.display = 'none';
     if (el('btnManualContract')) el('btnManualContract').style.display = 'none';
     if (el('alertBanner')) el('alertBanner').style.display = 'none';
+    if (el('schedAlertBanner')) el('schedAlertBanner').style.display = 'none';
     if (el('agentBanner')) el('agentBanner').style.display = 'block';
-    switchTab('contract');
+    const sidebars = document.querySelectorAll('#scheduleTab aside');
+    sidebars.forEach(s => s.style.display = 'none');
+    switchTab('schedule');
   } else {
+    if (el('tabC')) el('tabC').style.display = '';
     if (el('tabS')) el('tabS').style.display = '';
     if (el('tabR')) el('tabR').style.display = '';
     if (el('tabT')) el('tabT').style.display = '';
     if (el('tabP')) el('tabP').style.display = '';
     if (el('alertBanner')) el('alertBanner').style.display = 'flex';
+    if (el('schedAlertBanner')) el('schedAlertBanner').style.display = 'flex';
     if (el('agentBanner')) el('agentBanner').style.display = 'none';
+    const sidebars = document.querySelectorAll('#scheduleTab aside');
+    sidebars.forEach(s => s.style.display = 'block');
   }
 
   refreshUI();
@@ -2711,6 +2723,34 @@ function exportTaxExcel() {
 // ──────────── ALL EVENTS (auto + manual) ────────────
 function getAllEvents() {
   const evs = [];
+
+  if (authMode === 'viewer') {
+    const targetMonthStr = el('mainMonth') ? el('mainMonth').value : null;
+    ALL_ROOMS.forEach(rid => {
+      const room = appData.rooms[rid] || {};
+      const c = getPrimaryContract(room, targetMonthStr);
+      if (!c || !c.name) return;
+      if (c.renewalStatus !== 'expire') return;
+      const s = getStatus(room, targetMonthStr);
+      if (s === 'vacant' || s === 'upcoming') return;
+      const hasNextContract = (room.contracts || []).some(otherC => {
+        if (otherC.id === c.id) return false;
+        const oSDate = otherC.startDate ? new Date(otherC.startDate) : new Date('2000-01-01');
+        return oSDate > new Date(c.startDate || '2000-01-01');
+      });
+      if (hasNextContract) return;
+      
+      const d = c.agentDate || c.endDate;
+      if (d) {
+        evs.push({
+          id:`_exp_${rid}`, date:d,
+          title:`[매물] ${rid}호 입주가능`,
+          color:'#00d2ff', cat:'_exp', room:rid, done:false, type:'auto'
+        });
+      }
+    });
+    return evs;
+  }
 
   // Manual schedules
   Object.entries(appData.schedules || {}).forEach(([id, s]) => {
@@ -3792,7 +3832,7 @@ function renderAgentBanner() {
     const rentSumStr = rentSumNum > 0 ? formatMoney(rentSumNum.toString()) : '-';
     
     const dep = c.deposit ? formatMoney(c.deposit) : '-';
-    const dEnd = c.endDate ? fmtDate(c.endDate) : '-';
+    const dEnd = (c.agentDate || c.endDate) ? fmtDate(c.agentDate || c.endDate) : '-';
     
     tbody.innerHTML += `<tr onclick="openAgentModal('${id}')" style="${trStyle}">
       <td style="font-weight:800;">${id}</td>
@@ -3809,7 +3849,6 @@ function renderAgentBanner() {
 
 let curAgentRoom = null;
 function openAgentModal(roomId) {
-  if (authMode !== 'viewer') return;
   curAgentRoom = roomId;
   const room = appData.rooms[roomId] || {};
   const c = getPrimaryContract(room, el('mainMonth').value);
@@ -3817,6 +3856,7 @@ function openAgentModal(roomId) {
   
   el('agentModalTitle').textContent = `${roomId}호 매물 상태 변경`;
   el('agent_status').value = c.agentStatus || 'expire_expected';
+  el('agent_date').value = c.agentDate || c.endDate || '';
   el('agent_memo').value = c.agentMemo || '';
   
   el('agentModal').style.display = 'flex';
@@ -3836,6 +3876,7 @@ function saveAgentModal() {
   const c = getPrimaryContract(room, el('mainMonth').value);
   if (c) {
     c.agentStatus = el('agent_status').value;
+    c.agentDate = el('agent_date').value;
     c.agentMemo = el('agent_memo').value;
     saveData();
     refreshUI();
