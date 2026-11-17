@@ -1166,42 +1166,61 @@ header{
 
   <!-- ===== RENT TAB ===== -->
   <div class="tab-content" id="rentTab">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-      <h2 style="font-size:1.15rem; margin:0;">💰 월세 납부 현황</h2>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">기준월</label>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h2 style="font-size:1.15rem; margin:0;">💰 차임 납부현황</h2>
+        <button class="btn" id="btnHidePrevTenants" style="padding:4px 10px; font-size:0.78rem; border-radius:8px; background:rgba(255,165,2,0.1); border:1px solid rgba(255,165,2,0.3); color:var(--orange);" onclick="hidePrevTenantsBulk()" title="한 호실에 여러 세입자가 있을 때 이전 세입자 행을 일괄 숨깁니다">🧹 이전 세입자 일괄 숨김</button>
+        <button class="btn" id="btnToggleHiddenRows" style="padding:4px 10px; font-size:0.78rem; border-radius:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--dim);" onclick="toggleShowHiddenRentRows()">👁️ 숨긴 행 보기 (0건)</button>
+        <button class="btn" id="btnUnhideAllRows" style="display:none; padding:4px 10px; font-size:0.78rem; border-radius:8px; background:rgba(46,213,115,0.1); border:1px solid rgba(46,213,115,0.3); color:var(--green);" onclick="unhideAllRentRows()">↺ 숨김 전체 해제</button>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--dim);">기준연도/월</label>
         <div style="display:flex; align-items:center; gap:4px;">
-          <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.8rem; margin-right:8px;" onclick="exportRentExcel()">📥 엑셀</button>
+          <button class="btn btn-green-o" style="padding:4px 8px; font-size:0.8rem; margin-right:4px;" onclick="exportRentExcel()">📥 엑셀 추출</button>
           <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('rentMonth', -1)">◀</button>
           <input type="month" id="rentMonth" class="month-picker" onchange="renderRentGrid()" style="margin:0;">
           <button class="btn" style="padding:4px 8px; font-size:0.8rem; border-radius:6px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);" onclick="shiftMonth('rentMonth', 1)">▶</button>
         </div>
       </div>
     </div>
-    <div class="stats-bar" style="grid-template-columns:repeat(2,1fr);">
+    <div class="stats-bar" style="grid-template-columns:repeat(3,1fr);">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(255,211,42,0.15);color:var(--gold);">🏢</div>
+        <div class="stat-info"><div class="stat-val" id="rentTotalMonthly">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">월세 기준금액 합계 (숨김 제외)</div></div>
+      </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:rgba(0,210,255,0.15);color:#00d2ff;">💰</div>
-        <div class="stat-info"><div class="stat-val" id="rentIncome">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl" id="rentIncomeMonth">당월 납부 완료액</div></div>
+        <div class="stat-info"><div class="stat-val" id="rentIncome">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl" id="rentIncomeMonth">당월 통장 월세 입금액</div></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:rgba(255,71,87,0.15);color:var(--red);">⚠️</div>
-        <div class="stat-info"><div class="stat-val" id="rentUnpaid" style="color:var(--red);">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">총 미납액 (당월미납 + 기존미납)</div></div>
+        <div class="stat-info"><div class="stat-val" id="rentUnpaid" style="color:var(--red);">0<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span></div><div class="stat-lbl">연간 누적 미납 금액합계 (숨김 제외)</div></div>
       </div>
     </div>
     
     <div style="background:var(--surface); border-radius:12px; border:1px solid var(--border); overflow-x:auto;">
-      <table class="room-table">
+      <table class="room-table" id="rentMatrixTable">
         <thead>
           <tr>
             <th>호실</th>
-            <th>임차인</th>
-            <th class="td-right">보증금</th>
-            <th class="td-right">월세+관리비 합계</th>
-            <th class="td-center">최종 납부일</th>
-            <th class="td-right">누적납부 / 총예상액</th>
-            <th class="td-center">기존 미납액 (직접입력)</th>
-            <th class="td-center">당월 납부확인</th>
-            <th class="td-center">비고</th>
+            <th>이름</th>
+            <th class="td-right">월세금액</th>
+            <th class="td-center">1월</th>
+            <th class="td-center">2월</th>
+            <th class="td-center">3월</th>
+            <th class="td-center">4월</th>
+            <th class="td-center">5월</th>
+            <th class="td-center">6월</th>
+            <th class="td-center">7월</th>
+            <th class="td-center">8월</th>
+            <th class="td-center">9월</th>
+            <th class="td-center">10월</th>
+            <th class="td-center">11월</th>
+            <th class="td-center">12월</th>
+            <th class="td-center">미납월</th>
+            <th class="td-right">미납 금액합계 (수동입력 가능)</th>
+            <th>비고 (수동입력 가능)</th>
+            <th class="td-center">숨김</th>
           </tr>
         </thead>
         <tbody id="rentGridBody"></tbody>
@@ -3926,6 +3945,962 @@ setInterval(() => {
 }, 2000);
 
 // ──────────── STARTUP ────────────
+/* =====================================================================
+   [업그레이드 패치 v2] 
+   1. 미납금액합계 & 비고란 수동 수정 (빈칸 입력 시 자동수식 복원)
+   2. 행 숨김/표시 기능 및 합계·미납건수 자동 제외
+   3. 1년치 통합 업로드 & 월별(11월 등) 추가 업로드 완벽 호환
+   ===================================================================== */
+
+let showHiddenRentRows = false; // 숨긴 행 화면 표시 토글 상태
+
+// 1. 수입/지출 계정 카테고리 확장
+const TX_CATEGORIES_EXT = [
+  { val: '', label: '-- 미분류 --', type: '' },
+  { val: 'inc_rent', label: '🟢 월세', type: 'inc' },
+  { val: 'inc_insfee', label: '🟢 보증보험 수수료(입금)', type: 'inc' },
+  { val: 'inc_roomelec', label: '🟢 세대 전기요금(입금)', type: 'inc' },
+  { val: 'inc_other', label: '🟢 기타수입/환급금', type: 'inc' },
+  { val: 'exp_loan', label: '🔴 대출이자', type: 'exp' },
+  { val: 'exp_water', label: '🔴 수도요금', type: 'exp' },
+  { val: 'exp_elec', label: '🔴 전기요금', type: 'exp' },
+  { val: 'exp_maint', label: '🔴 위탁관리비', type: 'exp' },
+  { val: 'exp_safecar', label: '🔴 차량승강기 안전관리', type: 'exp' },
+  { val: 'exp_taxacct', label: '🔴 기장료', type: 'exp' },
+  { val: 'exp_safefire', label: '🔴 소방안전관리', type: 'exp' },
+  { val: 'exp_safeelec', label: '🔴 전기안전관리', type: 'exp' },
+  { val: 'exp_clean', label: '🔴 건물 청소비', type: 'exp' },
+  { val: 'exp_internet', label: '🔴 공용 인터넷TV', type: 'exp' },
+  { val: 'exp_safeelev', label: '🔴 승강기안전관리', type: 'exp' },
+  { val: 'exp_card', label: '🔴 카드대금', type: 'exp' },
+  { val: 'exp_phone', label: '🔴 휴대폰 요금', type: 'exp' },
+  { val: 'exp_cleanout', label: '🔴 퇴실청소', type: 'exp' },
+  { val: 'exp_roomelec', label: '🔴 세대 전기요금', type: 'exp' },
+  { val: 'exp_broker', label: '🔴 중개수수료', type: 'exp' },
+  { val: 'exp_wallpaper', label: '🔴 도배비용', type: 'exp' },
+  { val: 'exp_localtax', label: '🔴 지방세', type: 'exp' },
+  { val: 'exp_insfee', label: '🔴 보증보험료(지출)', type: 'exp' },
+  { val: 'exp_etc', label: '🔴 기타 잡비', type: 'exp' },
+  { val: 'inc_deposit', label: '🔵 보증금 입금 (부채증가)', type: 'inc_dep' },
+  { val: 'inc_dep_rent', label: '🟣 보증금+월세 합산 입금', type: 'inc_dep' },
+  { val: 'exp_deposit', label: '🔵 보증금 반환 (부채감소)', type: 'exp_dep' },
+  { val: 'transfer_in', label: '⚪ 자금 이동 (수입제외)', type: 'transfer' },
+  { val: 'transfer_out', label: '⚪ 자금 이동 (지출제외)', type: 'transfer' }
+];
+TX_CATEGORIES.length = 0;
+TX_CATEGORIES_EXT.forEach(c => TX_CATEGORIES.push(c));
+
+function getCatLabel(c) {
+  const f = TX_CATEGORIES.find(x => x.val === c);
+  return f ? f.label : c;
+}
+
+// 2. 과거 통장내역(1~10월) 이력에서 입금자명(rawRecord) 또는 적요로 계정·호실 자동 추론 (월별 업로드용)
+function guessFromHistoryEnhanced(rawContent, rawRecord, desc, isIncome) {
+  const txs = appData.transactions || [];
+  const recClean = String(rawRecord || '').trim();
+  const contClean = String(rawContent || '').trim();
+
+  for (let i = txs.length - 1; i >= 0; i--) {
+    const t = txs[i];
+    if (isIncome && !(t.income > 0)) continue;
+    if (!isIncome && !(t.expense > 0)) continue;
+    if (!t.category) continue;
+
+    // 1순위: 거래기록사항(입금자명/거래처명)이 정확히 일치하는 경우
+    if (recClean && recClean.length >= 2 && t.rawRecord && String(t.rawRecord).trim() === recClean) {
+      return { cat: t.category, room: t.matchedRoom || '' };
+    }
+    // 2순위: 전체 적요(desc)가 일치하는 경우
+    if (desc && t.desc === desc) {
+      return { cat: t.category, room: t.matchedRoom || '' };
+    }
+    // 3순위: 거래내용(rawContent)이 호실이 아닌 특정 키워드(예: 에스비소방, 동양파크 등)로 일치하는 경우
+    if (contClean && contClean.length >= 3 && contClean !== 'NH올원뱅크' && contClean !== '자동납부' && contClean !== '인터넷지로' && t.rawContent === contClean) {
+      return { cat: t.category, room: t.matchedRoom || '' };
+    }
+  }
+  return null;
+}
+
+// 3. 엑셀 '계정' 열 및 '이체메모' 열 매핑 + 월별 일반 통장내역 자동 분개
+function mapExcelCategory(acctStr, memoStr, contentStr, recordStr, desc, isIncome) {
+  const a = String(acctStr || '').replace(/\s+/g, '');
+  const m = String(memoStr || '').replace(/\s+/g, '');
+  const c = String(contentStr || '').replace(/\s+/g, '');
+  const r = String(recordStr || '').replace(/\s+/g, '');
+
+  // (1) F열 '계정' 값이 명시되어 있는 경우 최우선 매핑
+  if (a) {
+    if (a === '월세') return 'inc_rent';
+    if (a.indexOf('보증보험') > -1) return isIncome ? 'inc_insfee' : 'exp_insfee';
+    if (a.indexOf('기타수입') > -1 || a.indexOf('환급금') > -1) return 'inc_other';
+    if (a.indexOf('세대전기') > -1) return isIncome ? 'inc_roomelec' : 'exp_roomelec';
+    if (a.indexOf('전기안전') > -1) return 'exp_safeelec';
+    if (a.indexOf('전기요금') > -1 || a === '전기료') return 'exp_elec';
+    if (a.indexOf('수도') > -1) return 'exp_water';
+    if (a.indexOf('대출이자') > -1) return 'exp_loan';
+    if (a.indexOf('위탁관리') > -1) return 'exp_maint';
+    if (a.indexOf('차량승강기') > -1) return 'exp_safecar';
+    if (a.indexOf('승강기') > -1) return 'exp_safeelev';
+    if (a.indexOf('소방') > -1) return 'exp_safefire';
+    if (a.indexOf('인터넷') > -1 || a.indexOf('TV') > -1) return 'exp_internet';
+    if (a.indexOf('퇴실청소') > -1) return 'exp_cleanout';
+    if (a.indexOf('청소') > -1) return 'exp_clean';
+    if (a.indexOf('카드대금') > -1) return 'exp_card';
+    if (a.indexOf('휴대폰') > -1) return 'exp_phone';
+    if (a.indexOf('중개') > -1) return 'exp_broker';
+    if (a.indexOf('도배') > -1) return 'exp_wallpaper';
+    if (a.indexOf('지방세') > -1) return 'exp_localtax';
+    if (a.indexOf('기장') > -1) return 'exp_taxacct';
+    if (a.indexOf('자금이동') > -1) return isIncome ? 'transfer_in' : 'transfer_out';
+    if (a.indexOf('기타잡비') > -1 || a.indexOf('건강보험') > -1 || a.indexOf('NH올원뱅크') > -1) return 'exp_etc';
+  }
+
+  // (2) 이체메모(I열) 및 거래내용(G열) 기반 특수 분류
+  if (m.indexOf('퇴실보증금') > -1 || m.indexOf('가계약금반환') > -1 || (r.indexOf('반환') > -1 && m.indexOf('가계약') > -1)) {
+    return 'exp_deposit';
+  }
+  if (m.indexOf('보증금') > -1 || m.indexOf('가계약금') > -1 || m === '계약금' || (m === '수기입력' && isIncome)) {
+    return isIncome ? 'inc_deposit' : 'exp_deposit';
+  }
+  if (
+    m.indexOf('말레이') > -1 || m.indexOf('개인사용') > -1 || m.indexOf('외화보존') > -1 ||
+    m.indexOf('환전') > -1 || m.indexOf('자금이동') > -1 || m.indexOf('가수금') > -1 ||
+    c.indexOf('자금이동') > -1 || c.indexOf('삼성증권') > -1 || c.indexOf('기업은행') > -1 || c === '현금'
+  ) {
+    return isIncome ? 'transfer_in' : 'transfer_out';
+  }
+  if (m.indexOf('전기요금반환') > -1) return 'exp_roomelec';
+  if (m.indexOf('카드대금반환') > -1) return 'inc_other';
+  if (m.indexOf('오납반환') > -1) return 'exp_etc';
+  if (c.indexOf('기타잡비') > -1 || (m === '월세' && !isIncome)) return 'exp_etc';
+  if (!isIncome && ALL_ROOMS.includes(c)) return 'exp_deposit';
+
+  // (3) 월별 통장내역 업로드 시: 기존 1~10월 거래 이력(입금자명 등)과 대조
+  const hist = guessFromHistoryEnhanced(contentStr, recordStr, desc, isIncome);
+  if (hist && hist.cat) return hist.cat;
+
+  return guessTxCategory(c + ' ' + r + ' ' + m, isIncome);
+}
+
+// 4. 1년치 통합 파일 & 월별(11월 등) 단일 파일 모두 지원하는 스마트 업로드 함수
+async function importTxExcelData(e) {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  const defaultYear = new Date().getFullYear();
+  const yearStr = prompt(
+    `업로드하실 파일의 기준 연도(4자리)를 확인해주세요.\n` +
+    `(1년치 통합 파일과 월별 통장내역 파일을 모두 자동 인식합니다)`,
+    defaultYear
+  );
+  if (yearStr === null) { e.target.value = ''; return; }
+  const inputYear = parseInt(yearStr, 10) || defaultYear;
+
+  if (!appData.transactions) appData.transactions = [];
+
+  let parsedTxsAll = [];
+  let parsedRentRows = null;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = new Uint8Array(evt.target.result);
+          const wb = XLSX.read(data, { type: 'array' });
+
+          // ── [A] 통장내역 시트 파싱 ──
+          const txSheetName = wb.SheetNames.find(n => n.indexOf('통장') > -1 || n.indexOf('거래') > -1 || n.indexOf('내역') > -1) || wb.SheetNames[0];
+          const wsTx = wb.Sheets[txSheetName];
+          const rows = XLSX.utils.sheet_to_json(wsTx, { header: 1 });
+
+          let hdrIdx = -1;
+          for (let r = 0; r < Math.min(20, rows.length); r++) {
+            if (rows[r] && rows[r].some && rows[r].some(c => typeof c === 'string' && (
+              c.indexOf('출금') > -1 || c.indexOf('입금') > -1 || c.indexOf('맡기신') > -1 ||
+              c.indexOf('찾으신') > -1 || c.indexOf('거래내용') > -1 || c.indexOf('적요') > -1
+            ))) {
+              hdrIdx = r;
+              break;
+            }
+          }
+
+          if (hdrIdx !== -1) {
+            const hdrs = rows[hdrIdx];
+            let seqCol = -1, dtCol = -1, expCol = -1, incCol = -1, balCol = -1, acctCol = -1, contentCol = -1, recordCol = -1, memoCol = -1;
+
+            hdrs.forEach((h, idx) => {
+              if (typeof h !== 'string') return;
+              const hs = h.replace(/\s+/g, '');
+              if (hs === '구분' || hs === '순번' || hs === '번호') seqCol = idx;
+              else if (hs.indexOf('날짜') > -1 || hs.indexOf('일시') > -1 || hs.indexOf('거래일') > -1) dtCol = idx;
+              else if (hs.indexOf('맡기신') > -1 || hs.indexOf('입금') > -1 || hs.indexOf('수입') > -1) incCol = idx;
+              else if (hs.indexOf('찾으신') > -1 || hs.indexOf('출금') > -1 || hs.indexOf('지출') > -1) expCol = idx;
+              else if (hs.indexOf('잔액') > -1) balCol = idx;
+              else if (hs.indexOf('계정') > -1 || hs.indexOf('분류') > -1) acctCol = idx;
+              else if (hs.indexOf('기록사항') > -1 || hs.indexOf('기록') > -1 || hs.indexOf('기재내용') > -1) recordCol = idx;
+              else if (hs.indexOf('내용') > -1 || hs.indexOf('적요') > -1) contentCol = idx;
+              else if (hs.indexOf('메모') > -1 || hs.indexOf('비고') > -1) memoCol = idx;
+            });
+
+            let lastValidDateStr = '';
+
+            for (let r = hdrIdx + 1; r < rows.length; r++) {
+              const rowData = rows[r];
+              if (!rowData || rowData.length === 0) continue;
+
+              const rawSeq = seqCol !== -1 ? rowData[seqCol] : '';
+              const rawDt = dtCol !== -1 ? rowData[dtCol] : '';
+              const rawInc = incCol !== -1 ? rowData[incCol] : 0;
+              const rawExp = expCol !== -1 ? rowData[expCol] : 0;
+              const rawBal = balCol !== -1 ? rowData[balCol] : 0;
+              const rawAcct = acctCol !== -1 ? String(rowData[acctCol] || '').trim() : '';
+              const rawContent = contentCol !== -1 ? String(rowData[contentCol] || '').trim() : '';
+              const rawRecord = recordCol !== -1 ? String(rowData[recordCol] || '').trim() : '';
+              const rawMemo = memoCol !== -1 ? String(rowData[memoCol] || '').trim() : '';
+
+              const inc = parseInt(String(rawInc || '0').replace(/[^0-9]/g, ''), 10) || 0;
+              const exp = parseInt(String(rawExp || '0').replace(/[^0-9]/g, ''), 10) || 0;
+              const bal = parseInt(String(rawBal || '0').replace(/[^0-9-]/g, ''), 10) || 0;
+
+              if (inc === 0 && exp === 0) continue;
+              if (!rawSeq && !rawDt && !rawAcct && !rawContent && !rawRecord) continue;
+              if (inc > 0 && exp > 0 && !rawContent && !rawRecord) continue;
+
+              let dateStr = '';
+              if (rawDt !== undefined && rawDt !== null && rawDt !== '') {
+                dateStr = typeof rawDt === 'number' ? parseExcelDate(rawDt) : parseExcelDate(String(rawDt).trim());
+                if (dateStr) {
+                  dateStr = String(dateStr).replace(/[^0-9-.\/]/g, ' ').trim().split(' ')[0].replace(/\//g, '-').replace(/\./g, '-');
+                  if (dateStr.split('-').length === 2) {
+                    dateStr = `${inputYear}-${dateStr}`;
+                  }
+                  const dp = dateStr.split('-');
+                  if (dp.length === 3) {
+                    dateStr = `${dp[0]}-${String(dp[1]).padStart(2, '0')}-${String(dp[2]).padStart(2, '0')}`;
+                  }
+                  lastValidDateStr = dateStr;
+                }
+              }
+              if (!dateStr && lastValidDateStr) {
+                dateStr = lastValidDateStr;
+              }
+              if (!dateStr) continue;
+
+              const isIncome = inc > 0;
+              const cleanRoomCandidate = rawContent.replace(/호$/, '').trim();
+
+              // 적요(desc) 먼저 생성
+              let descParts = [];
+              if (rawContent && !ALL_ROOMS.includes(cleanRoomCandidate)) descParts.push(rawContent);
+              if (rawRecord && rawRecord !== rawContent) descParts.push(rawRecord);
+              if (rawMemo) descParts.push(`(${rawMemo})`);
+              let desc = descParts.join(' · ');
+              if (!desc) desc = rawRecord || rawContent || rawAcct || '-';
+
+              // 호실 매칭 (1순위: G열 호실번호, 2순위: 기존 거래이력 입금자명 매칭, 3순위: 차임납부현황/계약현황 이름 매칭)
+              let matchedRoom = '';
+              if (ALL_ROOMS.includes(cleanRoomCandidate)) {
+                matchedRoom = cleanRoomCandidate;
+              } else {
+                const hist = guessFromHistoryEnhanced(rawContent, rawRecord, desc, isIncome);
+                if (hist && hist.room) {
+                  matchedRoom = hist.room;
+                }
+                if (!matchedRoom) {
+                  const combinedText = `${rawContent} ${rawRecord} ${rawMemo}`;
+                  for (let rm of ALL_ROOMS) {
+                    const rx = new RegExp('(?:^|[^0-9])' + rm + '(?:호|[^0-9]|$)');
+                    if (rx.test(combinedText)) { matchedRoom = rm; break; }
+                  }
+                }
+                if (!matchedRoom && appData.rentSheetRows && appData.rentSheetRows[String(inputYear)]) {
+                  // 차임납부현황 시트의 임차인 이름으로 호실 찾기
+                  const rRow = appData.rentSheetRows[String(inputYear)].find(x => x.name && (rawRecord.indexOf(x.name) > -1 || rawContent.indexOf(x.name) > -1));
+                  if (rRow) matchedRoom = rRow.room;
+                }
+                if (!matchedRoom) {
+                  matchedRoom = matchRoomForRent(`${rawContent} ${rawRecord}`);
+                }
+              }
+
+              const cat = mapExcelCategory(rawAcct, rawMemo, rawContent, rawRecord, desc, isIncome);
+
+              parsedTxsAll.push({
+                id: genId(),
+                date: dateStr,
+                desc: desc,
+                rawContent: rawContent,
+                rawRecord: rawRecord,
+                rawAcct: rawAcct,
+                rawMemo: rawMemo,
+                income: inc,
+                expense: exp,
+                balance: bal,
+                category: cat,
+                matchedRoom: matchedRoom
+              });
+            }
+          }
+
+          // ── [B] '차임납부현황' 시트가 함께 있는 경우 파싱 ──
+          const rentSheetName = wb.SheetNames.find(n => n.indexOf('납부') > -1 || n.indexOf('차임') > -1);
+          if (rentSheetName) {
+            const wsRent = wb.Sheets[rentSheetName];
+            const rRows = XLSX.utils.sheet_to_json(wsRent, { header: 1, defval: null });
+
+            let rHdrIdx = -1;
+            for (let r = 0; r < Math.min(10, rRows.length); r++) {
+              if (rRows[r] && rRows[r].some && rRows[r].some(c => String(c || '').replace(/\s+/g, '') === '호실')) {
+                rHdrIdx = r;
+                break;
+              }
+            }
+
+            if (rHdrIdx !== -1) {
+              const yearRows = [];
+              // 기존에 숨김 처리했거나 수동 수정한 내역이 있다면 보존하기 위해 기존 맵 참조
+              const prevRows = (appData.rentSheetRows && appData.rentSheetRows[String(inputYear)]) || [];
+
+              for (let r = rHdrIdx + 1; r < rRows.length; r++) {
+                const row = rRows[r];
+                if (!row) continue;
+                const rawRoom = String(row[0] || '').trim();
+                if (rawRoom === '집계' || !rawRoom) break;
+
+                const roomNum = rawRoom.replace(/[^0-9]/g, '');
+                if (!ALL_ROOMS.includes(roomNum)) continue;
+
+                const tName = String(row[1] || '').trim();
+                const rentAmt = parseInt(String(row[2] || '0').replace(/[^0-9]/g, ''), 10) || 0;
+
+                const activeMonths = {};
+                const manualMonths = {};
+
+                for (let m = 1; m <= 12; m++) {
+                  const colIdx = 2 + m;
+                  const cellAddr = XLSX.utils.encode_cell({ r: r, c: colIdx });
+                  const cellObj = wsRent[cellAddr];
+                  const cellVal = row[colIdx] !== null && row[colIdx] !== undefined ? String(row[colIdx]).trim() : '';
+
+                  if (cellObj && cellObj.f) {
+                    activeMonths[m] = true;
+                  } else if (cellVal !== '') {
+                    activeMonths[m] = true;
+                    manualMonths[m] = cellVal;
+                  }
+                }
+
+                const qCellAddr = XLSX.utils.encode_cell({ r: r, c: 16 });
+                const qCellObj = wsRent[qCellAddr];
+                let manualUnpaidAmt = null;
+                if (qCellObj && !qCellObj.f && qCellObj.v !== undefined && qCellObj.v !== null && qCellObj.v !== '') {
+                  manualUnpaidAmt = parseInt(String(qCellObj.v).replace(/[^0-9-]/g, ''), 10);
+                }
+
+                const noteStr = row[17] ? String(row[17]).trim() : '';
+                const existing = prevRows.find(p => p.room === roomNum && p.name === tName && p.rent === rentAmt);
+
+                yearRows.push({
+                  rowId: `${roomNum}_${tName}_${rentAmt}_${r}`,
+                  room: roomNum,
+                  name: tName,
+                  rent: rentAmt,
+                  activeMonths: activeMonths,
+                  manualMonths: manualMonths,
+                  manualUnpaidAmt: manualUnpaidAmt,
+                  note: noteStr,
+                  hidden: existing ? !!existing.hidden : false
+                });
+              }
+
+              // 한 호실에 2명 이상일 때 이전 세입자 행의 불필요한 12월 잔여 수식 정리 및 11월 활성월 자동 보정
+              const byRoom = {};
+              yearRows.forEach(item => {
+                if (!byRoom[item.room]) byRoom[item.room] = [];
+                byRoom[item.room].push(item);
+              });
+              Object.values(byRoom).forEach(list => {
+                list.forEach((item, idx) => {
+                  const isLastTenantOfRoom = idx === list.length - 1;
+                  if (!isLastTenantOfRoom && !item.activeMonths[10] && !item.activeMonths[11]) {
+                    delete item.activeMonths[12];
+                  }
+                  // 현재 세입자(10월과 12월이 활성인 세입자)는 11월 통장내역 업로드 시 자동 인식되도록 11월도 활성 처리
+                  if (isLastTenantOfRoom && item.activeMonths[10]) {
+                    item.activeMonths[11] = true;
+                    item.activeMonths[12] = true;
+                  }
+                });
+              });
+
+              parsedRentRows = yearRows;
+            }
+          }
+        } catch (err) {
+          console.error('Error parsing file ' + file.name, err);
+        }
+        resolve();
+      };
+      reader.onerror = resolve;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  // ── [C] 업로드된 파일의 월(YYYY-MM) 범위를 분석하여 맞춤형 저장 처리 ──
+  const uploadedMonths = Array.from(new Set(parsedTxsAll.map(t => t.date.substring(0, 7)))).sort();
+
+  if (parsedTxsAll.length > 0) {
+    if (uploadedMonths.length === 1 && !parsedRentRows) {
+      // ★ 케이스 1: 11월 말 등 '단일 월(1개월치)' 통장내역만 업로드한 경우 (1~10월 데이터 절대 보존!)
+      const targetYm = uploadedMonths[0];
+      const existingInMonth = appData.transactions.filter(t => String(t.date || '').startsWith(targetYm)).length;
+
+      if (existingInMonth > 0) {
+        const replaceMonth = confirm(
+          `[${targetYm}월 통장내역 업로드 감지]\n\n` +
+          `기존 다른 월(1~10월 등) 데이터는 안전하게 그대로 유지됩니다.\n` +
+          `이미 등록된 ${targetYm}월 내역(${existingInMonth}건)을 새 파일(${parsedTxsAll.length}건)로 교체하시겠습니까?\n\n` +
+          `- [확인]: ${targetYm}월 내역만 깔끔하게 교체 (권장)\n` +
+          `- [취소]: 기존 ${targetYm}월 내역 뒤에 중복 없이 추가`
+        );
+        if (replaceMonth) {
+          appData.transactions = appData.transactions.filter(t => !String(t.date || '').startsWith(targetYm));
+          appData.transactions.push(...parsedTxsAll);
+        } else {
+          parsedTxsAll.forEach(nt => {
+            const isDup = appData.transactions.some(et => et.date === nt.date && et.income === nt.income && et.expense === nt.expense && et.balance === nt.balance);
+            if (!isDup) appData.transactions.push(nt);
+          });
+        }
+      } else {
+        // 해당 월 내역이 처음 올라오는 경우 (예: 11월 30일에 11월 내역 첫 업로드) 바로 추가!
+        appData.transactions.push(...parsedTxsAll);
+      }
+    } else {
+      // ★ 케이스 2: 여러 달이 포함된 1년치 통합 엑셀 파일을 업로드한 경우
+      const replaceYear = confirm(
+        `[${uploadedMonths[0]} ~ ${uploadedMonths[uploadedMonths.length - 1]} 통합 내역 (${parsedTxsAll.length}건) 감지]\n\n` +
+        `${inputYear}년도 기존 거래내역을 지우고 이 파일의 내용으로 교체하시겠습니까?\n\n` +
+        `- [확인]: ${inputYear}년 거래내역 전체 교체 (1년치 통합본 업로드 시 권장)\n` +
+        `- [취소]: 기존 내역 유지하며 중복 없는 건만 추가`
+      );
+      if (replaceYear) {
+        appData.transactions = appData.transactions.filter(t => !String(t.date || '').startsWith(String(inputYear)));
+        appData.transactions.push(...parsedTxsAll);
+      } else {
+        parsedTxsAll.forEach(nt => {
+          const isDup = appData.transactions.some(et => et.date === nt.date && et.income === nt.income && et.expense === nt.expense && et.balance === nt.balance);
+          if (!isDup) appData.transactions.push(nt);
+        });
+      }
+    }
+  }
+
+  if (parsedRentRows) {
+    if (!appData.rentSheetRows) appData.rentSheetRows = {};
+    appData.rentSheetRows[String(inputYear)] = parsedRentRows;
+  }
+
+  if (parsedTxsAll.length > 0 || parsedRentRows) {
+    appData.transactions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (uploadedMonths.length > 0) {
+      const latestYm = uploadedMonths[uploadedMonths.length - 1];
+      if (el('txMonth')) el('txMonth').value = latestYm;
+      if (el('rentMonth')) el('rentMonth').value = latestYm;
+      if (el('pnlMonth')) el('pnlMonth').value = latestYm;
+    }
+    await saveData();
+    refreshUI();
+    alert(
+      `✅ 업로드가 완료되었습니다!\n\n` +
+      `• 반영된 월 범위: ${uploadedMonths.join(', ') || '-'}\n` +
+      `• 통장 거래내역: ${parsedTxsAll.length}건 처리\n` +
+      (parsedRentRows ? `• 차임납부현황 시트: ${parsedRentRows.length}개 행 반영` : `• 기존 차임납부현황에 새 통장내역 자동 연동 완료`)
+    );
+  } else {
+    alert('업로드할 내역을 찾지 못했습니다.');
+  }
+  e.target.value = '';
+}
+
+// 5. 차임납부현황 수식 계산 (COUNTIFS + SUMIFS + MAX + TEXTJOIN)
+function evaluateRentRowFormula(rowItem, yearStr, maxEvalMonth) {
+  const txs = appData.transactions || [];
+  const roomStr = String(rowItem.room);
+
+  const roomRentTxs = txs.filter(t =>
+    String(t.date || '').startsWith(yearStr + '-') &&
+    t.category === 'inc_rent' &&
+    String(t.matchedRoom) === roomStr &&
+    (t.income || 0) > 0
+  );
+
+  const monthStatus = {};
+  let countO = 0;
+  let countX = 0;
+  const unpaidMonthsList = [];
+
+  for (let m = 1; m <= 12; m++) {
+    if (rowItem.manualMonths && rowItem.manualMonths[m] !== undefined) {
+      const mv = rowItem.manualMonths[m];
+      monthStatus[m] = mv;
+      if (mv === 'O') countO++;
+      else if (mv === 'X') { countX++; unpaidMonthsList.push(m); }
+      continue;
+    }
+
+    if (!rowItem.activeMonths || !rowItem.activeMonths[m] || m > maxEvalMonth) {
+      monthStatus[m] = '';
+      continue;
+    }
+
+    const ymPrefix = `${yearStr}-${String(m).padStart(2, '0')}`;
+    const hasPaymentInMonth = roomRentTxs.some(t => String(t.date).startsWith(ymPrefix));
+    if (hasPaymentInMonth) {
+      monthStatus[m] = 'O';
+      countO++;
+    } else {
+      monthStatus[m] = 'X';
+      countX++;
+      unpaidMonthsList.push(m);
+    }
+  }
+
+  const unpaidMonthStr = unpaidMonthsList.length === 0 ? '-' : unpaidMonthsList.join(', ') + '월';
+
+  // 자동 수식 계산값
+  const sumAllRoomRent = roomRentTxs.reduce((acc, t) => acc + (t.income || 0), 0);
+  const expectedAmt = (countO + countX) * (rowItem.rent || 0);
+  const autoUnpaidAmt = Math.max(0, expectedAmt - sumAllRoomRent);
+
+  // 수동 입력값이 있으면 수동값 우선, 없으면 자동 수식값 사용
+  const isManualUnpaid = rowItem.manualUnpaidAmt !== null && rowItem.manualUnpaidAmt !== undefined && rowItem.manualUnpaidAmt !== '' && !isNaN(rowItem.manualUnpaidAmt);
+  const unpaidAmt = isManualUnpaid ? Number(rowItem.manualUnpaidAmt) : autoUnpaidAmt;
+
+  return {
+    monthStatus,
+    unpaidMonthStr,
+    unpaidAmt,
+    autoUnpaidAmt,
+    isManualUnpaid
+  };
+}
+
+// 6. [요청 1번] 미납 금액합계 & 비고란 수동 수정 함수
+function updateRentRowUnpaidAmt(yearStr, rowIdx, valStr) {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); renderRentGrid(); return; }
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows[rowIdx]) return;
+
+  const cleaned = String(valStr || '').replace(/[^0-9-]/g, '');
+  if (cleaned === '') {
+    // 빈칸으로 지우면 수동 고정 해제 -> 자동 수식 계산으로 복귀
+    rows[rowIdx].manualUnpaidAmt = null;
+  } else {
+    rows[rowIdx].manualUnpaidAmt = parseInt(cleaned, 10) || 0;
+  }
+  saveData().then(() => renderRentGrid());
+}
+
+function resetRentRowUnpaidAmt(yearStr, rowIdx) {
+  if (authMode !== 'admin') return;
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows[rowIdx]) return;
+  rows[rowIdx].manualUnpaidAmt = null;
+  saveData().then(() => renderRentGrid());
+}
+
+function updateRentRowNote(yearStr, rowIdx, valStr) {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); renderRentGrid(); return; }
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows[rowIdx]) return;
+  rows[rowIdx].note = String(valStr || '').trim();
+
+  // 계약현황 메모에도 동기화
+  const rm = appData.rooms[rows[rowIdx].room];
+  if (rm && rm.contracts) {
+    const c = rm.contracts.find(x => x.name === rows[rowIdx].name);
+    if (c) c.memo = rows[rowIdx].note;
+  }
+  saveData();
+}
+
+// 7. [요청 2번] 행 숨기기 / 이전 세입자 일괄 숨김 / 숨긴 행 보기 토글 함수
+function toggleRentRowHide(yearStr, rowIdx) {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows[rowIdx]) return;
+  rows[rowIdx].hidden = !rows[rowIdx].hidden;
+  saveData().then(() => renderRentGrid());
+}
+
+function toggleShowHiddenRentRows() {
+  showHiddenRentRows = !showHiddenRentRows;
+  renderRentGrid();
+}
+
+function hidePrevTenantsBulk() {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const pm = el('rentMonth') && el('rentMonth').value ? el('rentMonth').value : getCurrMonthStr();
+  const yearStr = pm.split('-')[0];
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows.length) return;
+
+  // 같은 호실에 2개 이상의 행이 있을 때 마지막(현재) 행을 제외한 앞선 행들을 일괄 숨김
+  const byRoom = {};
+  rows.forEach(r => {
+    if (!byRoom[r.room]) byRoom[r.room] = [];
+    byRoom[r.room].push(r);
+  });
+
+  let hiddenCount = 0;
+  Object.values(byRoom).forEach(list => {
+    if (list.length > 1) {
+      for (let i = 0; i < list.length - 1; i++) {
+        if (!list[i].hidden) {
+          list[i].hidden = true;
+          hiddenCount++;
+        }
+      }
+    }
+  });
+
+  if (hiddenCount > 0) {
+    saveData().then(() => {
+      renderRentGrid();
+      alert(`✅ 동일 호실 내 이전 세입자 ${hiddenCount}건이 숨김 처리되었습니다.\n(하단 합계 금액과 미납 건수에서도 자동 제외되었습니다)`);
+    });
+  } else {
+    alert('추가로 숨길 이전 세입자 행이 없습니다.');
+  }
+}
+
+function unhideAllRentRows() {
+  if (authMode !== 'admin') return;
+  const pm = el('rentMonth') && el('rentMonth').value ? el('rentMonth').value : getCurrMonthStr();
+  const yearStr = pm.split('-')[0];
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows) return;
+  rows.forEach(r => { r.hidden = false; });
+  showHiddenRentRows = false;
+  saveData().then(() => renderRentGrid());
+}
+
+function cycleRentCellStatus(yearStr, rowIdx, monthNum) {
+  if (authMode !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const rows = appData.rentSheetRows && appData.rentSheetRows[yearStr];
+  if (!rows || !rows[rowIdx]) return;
+  const item = rows[rowIdx];
+  if (!item.manualMonths) item.manualMonths = {};
+  if (!item.activeMonths) item.activeMonths = {};
+
+  const curManual = item.manualMonths[monthNum];
+  if (curManual === undefined) {
+    item.manualMonths[monthNum] = 'O';
+    item.activeMonths[monthNum] = true;
+  } else if (curManual === 'O') {
+    item.manualMonths[monthNum] = 'X';
+    item.activeMonths[monthNum] = true;
+  } else if (curManual === 'X') {
+    item.manualMonths[monthNum] = '공실';
+    item.activeMonths[monthNum] = true;
+  } else {
+    delete item.manualMonths[monthNum];
+  }
+  saveData().then(() => renderRentGrid());
+}
+
+// 8. 차임 납부현황 그리드 렌더링 (수동 입력란 + 숨김 행 제외 집계 완벽 반영)
+function renderRentGrid() {
+  const tbd = el('rentGridBody');
+  if (!tbd) return;
+  tbd.innerHTML = '';
+
+  const pm = el('rentMonth') && el('rentMonth').value ? el('rentMonth').value : getCurrMonthStr();
+  const [yearStr, monthStr] = pm.split('-');
+  const selectedMonthNum = parseInt(monthStr, 10) || 10;
+
+  const txs = appData.transactions || [];
+  const monthRentIncome = txs
+    .filter(t => String(t.date || '').startsWith(pm) && t.category === 'inc_rent')
+    .reduce((s, t) => s + (t.income || 0), 0);
+  if (el('rentIncomeMonth')) el('rentIncomeMonth').textContent = `${selectedMonthNum}월 통장 월세 입금액`;
+  if (el('rentIncome')) el('rentIncome').innerHTML = formatMoney(monthRentIncome) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+
+  // 차임납부현황 행 데이터 준비 (없으면 계약현황에서 생성 후 저장하여 수동 수정·숨김이 가능하도록 처리)
+  if (!appData.rentSheetRows) appData.rentSheetRows = {};
+  if (!appData.rentSheetRows[yearStr] || appData.rentSheetRows[yearStr].length === 0) {
+    const genRows = [];
+    getSortedRooms().forEach(rid => {
+      const rm = appData.rooms[rid] || {};
+      const c = getPrimaryContract(rm, pm);
+      if (!c || !c.name) return;
+      const rentAmt = (parseInt(c.monthly || 0, 10) || 0) + (parseInt(c.maint || 0, 10) || 0);
+      const act = {};
+      for (let m = 1; m <= 12; m++) act[m] = true;
+      genRows.push({
+        room: rid,
+        name: c.name,
+        rent: rentAmt,
+        activeMonths: act,
+        manualMonths: {},
+        manualUnpaidAmt: null,
+        note: c.memo || '',
+        hidden: false
+      });
+    });
+    if (genRows.length > 0) appData.rentSheetRows[yearStr] = genRows;
+  }
+
+  const rows = appData.rentSheetRows[yearStr] || [];
+  const totalHiddenCount = rows.filter(r => r.hidden).length;
+
+  // 상단 숨김 버튼 UI 업데이트
+  const btnToggle = el('btnToggleHiddenRows');
+  if (btnToggle) {
+    btnToggle.textContent = showHiddenRentRows ? `🙈 숨긴 행 감추기 (${totalHiddenCount}건)` : `👁️ 숨긴 행 보기 (${totalHiddenCount}건)`;
+    btnToggle.style.borderColor = totalHiddenCount > 0 ? 'var(--gold)' : 'var(--border)';
+    btnToggle.style.color = totalHiddenCount > 0 ? 'var(--gold)' : 'var(--dim)';
+  }
+  const btnUnhideAll = el('btnUnhideAllRows');
+  if (btnUnhideAll) {
+    btnUnhideAll.style.display = totalHiddenCount > 0 ? 'inline-flex' : 'none';
+  }
+
+  let totalMonthlyRent = 0;
+  let grandTotalUnpaid = 0;
+  const monthlyUnpaidRooms = {};
+  for (let m = 1; m <= 12; m++) monthlyUnpaidRooms[m] = [];
+
+  let html = '';
+  rows.forEach((item, rIdx) => {
+    const isHidden = !!item.hidden;
+    // 숨긴 행이고 '숨긴 행 보기'가 꺼져 있으면 화면에서도 완전히 숨김
+    if (isHidden && !showHiddenRentRows) return;
+
+    const res = evaluateRentRowFormula(item, yearStr, selectedMonthNum);
+
+    // ★ 중요: 숨긴 행(isHidden === true)은 아래 합계금액과 월별 미납 건수에서 100% 제외!
+    if (!isHidden) {
+      totalMonthlyRent += (item.rent || 0);
+      grandTotalUnpaid += res.unpaidAmt;
+    }
+
+    let monthCellsHtml = '';
+    for (let m = 1; m <= 12; m++) {
+      const st = res.monthStatus[m];
+      const isManual = item.manualMonths && item.manualMonths[m] !== undefined;
+      if (!isHidden && st === 'X') monthlyUnpaidRooms[m].push(item.room);
+
+      let badgeStyle = 'color:var(--dim);';
+      if (st === 'O') badgeStyle = 'color:var(--green); font-weight:800;';
+      else if (st === 'X') badgeStyle = 'color:var(--red); font-weight:900; background:rgba(255,71,87,0.15); border-radius:4px; padding:2px 6px;';
+      else if (st === '공실') badgeStyle = 'color:var(--orange); font-size:0.75rem; font-weight:700;';
+
+      const manualDot = isManual ? '<sup style="color:var(--gold);font-size:0.55rem;">M</sup>' : '';
+      monthCellsHtml += `<td class="td-center" style="cursor:pointer;" title="클릭: O → X → 공실 → 자동" onclick="cycleRentCellStatus('${yearStr}', ${rIdx}, ${m})"><span style="${badgeStyle}">${st || '-'}${manualDot}</span></td>`;
+    }
+
+    const unpaidMColor = res.unpaidMonthStr !== '-' ? 'color:var(--red); font-weight:700;' : 'color:var(--dim);';
+    const unpaidInputStyle = [
+      'width:105px',
+      'padding:4px 8px',
+      'border-radius:6px',
+      'text-align:right',
+      'font-family:inherit',
+      'font-weight:800',
+      'font-size:0.84rem',
+      res.unpaidAmt > 0 ? 'color:var(--red)' : 'color:var(--text)',
+      res.isManualUnpaid ? 'background:rgba(255,211,42,0.12); border:1px solid var(--gold);' : 'background:rgba(255,255,255,0.04); border:1px solid var(--border);'
+    ].join(';');
+
+    const resetBtnHtml = res.isManualUnpaid
+      ? `<button onclick="resetRentRowUnpaidAmt('${yearStr}', ${rIdx})" title="수동 입력 해제 (자동 계산값: ${formatMoney(res.autoUnpaidAmt)}원으로 복원)" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:0.75rem;padding:0 3px;">↺</button>`
+      : '';
+
+    const safeNote = String(item.note || '').replace(/"/g, '"');
+    const rowStyle = isHidden ? 'opacity:0.42; background:rgba(0,0,0,0.35);' : '';
+
+    html += `<tr style="${rowStyle}">
+      <td style="font-weight:800;" onclick="openContractModal('${item.room}')">${item.room}</td>
+      <td style="font-weight:700;" onclick="openContractModal('${item.room}')">${item.name}${isHidden ? ' <span style="font-size:0.7rem;color:var(--orange);">(숨김)</span>' : ''}</td>
+      <td class="td-right" style="color:var(--gold); font-weight:700;">${formatMoney(item.rent)}</td>
+      ${monthCellsHtml}
+      <td class="td-center" style="${unpaidMColor}">${res.unpaidMonthStr}</td>
+      <td class="td-right" onclick="event.stopPropagation();">
+        <div style="display:inline-flex; align-items:center; justify-content:flex-end; gap:2px;">
+          ${resetBtnHtml}
+          <input type="text" value="${formatMoney(res.unpaidAmt)}" style="${unpaidInputStyle}"
+            title="${res.isManualUnpaid ? '수동 입력됨 (비우거나 ↺ 클릭 시 자동수식 복원)' : '자동 계산됨 (클릭하여 수동 금액 입력 가능)'}"
+            onchange="updateRentRowUnpaidAmt('${yearStr}', ${rIdx}, this.value)">
+        </div>
+      </td>
+      <td onclick="event.stopPropagation();">
+        <input type="text" value="${safeNote}" placeholder="비고 입력..."
+          style="width:100%; min-width:170px; padding:4px 8px; border-radius:6px; background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--text); font-family:inherit; font-size:0.8rem;"
+          onchange="updateRentRowNote('${yearStr}', ${rIdx}, this.value)">
+      </td>
+      <td class="td-center" onclick="event.stopPropagation();">
+        <button class="btn" style="padding:3px 8px; font-size:0.72rem; border-radius:6px; margin:0 auto;" onclick="toggleRentRowHide('${yearStr}', ${rIdx})">
+          ${isHidden ? '표시' : '숨김'}
+        </button>
+      </td>
+    </tr>`;
+  });
+
+  // 하단 집계 행 (숨긴 행은 건수·금액 모두 제외됨)
+  let summaryMonthCells = '';
+  for (let m = 1; m <= 12; m++) {
+    const cnt = monthlyUnpaidRooms[m].length;
+    const roomsTip = cnt > 0 ? monthlyUnpaidRooms[m].join(', ') + '호' : '미납 없음';
+    summaryMonthCells += `<td class="td-center" style="color:${cnt > 0 ? 'var(--red)' : 'var(--dim)'}; font-weight:800;" title="${roomsTip}">${cnt}건</td>`;
+  }
+
+  html += `<tr style="background:rgba(255,211,42,0.08); font-weight:900; border-top:2px solid var(--gold);">
+    <td colspan="2" class="td-center" style="color:var(--gold);">집 계 (숨김 제외)</td>
+    <td class="td-right" style="color:var(--gold);">${formatMoney(totalMonthlyRent)}</td>
+    ${summaryMonthCells}
+    <td class="td-center">-</td>
+    <td class="td-right" style="color:var(--red); font-size:0.95rem;">${formatMoney(grandTotalUnpaid)}</td>
+    <td colspan="2" style="font-size:0.75rem; color:var(--dim); text-align:right;">${totalHiddenCount > 0 ? `숨김 제외됨 (${totalHiddenCount}건)` : ''}</td>
+  </tr>`;
+
+  tbd.innerHTML = html;
+
+  if (el('rentTotalMonthly')) el('rentTotalMonthly').innerHTML = formatMoney(totalMonthlyRent) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  if (el('rentUnpaid')) el('rentUnpaid').innerHTML = formatMoney(grandTotalUnpaid) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+}
+
+// 9. 차임 납부현황 엑셀 추출 시에도 숨긴 행 제외 및 1~12월 매트릭스 그대로 추출
+function exportRentExcel() {
+  const pm = el('rentMonth') && el('rentMonth').value ? el('rentMonth').value : getCurrMonthStr();
+  const [yearStr, monthStr] = pm.split('-');
+  const selectedMonthNum = parseInt(monthStr, 10) || 10;
+  const rowsData = (appData.rentSheetRows && appData.rentSheetRows[yearStr]) || [];
+
+  const aoa = [['호실', '이름', '월세금액', '1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월', '미납월', '금액합계', '비고']];
+  let sumRent = 0, sumUnpaid = 0;
+  const mUnpaidCnt = [0,0,0,0,0,0,0,0,0,0,0,0];
+
+  rowsData.forEach(item => {
+    if (item.hidden) return; // 숨긴 행 제외
+    const res = evaluateRentRowFormula(item, yearStr, selectedMonthNum);
+    sumRent += (item.rent || 0);
+    sumUnpaid += res.unpaidAmt;
+    const mArr = [];
+    for (let m = 1; m <= 12; m++) {
+      const st = res.monthStatus[m] || '';
+      if (st === 'X') mUnpaidCnt[m - 1]++;
+      mArr.push(st);
+    }
+    aoa.push([item.room, item.name, item.rent || 0, ...mArr, res.unpaidMonthStr, res.unpaidAmt, item.note || '']);
+  });
+
+  aoa.push(['집계', '', sumRent, ...mUnpaidCnt, '', sumUnpaid, '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  applyExcelStyle(ws);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '차임납부현황');
+  XLSX.writeFile(wb, `태영아너스_차임납부현황_${pm}.xlsx`);
+}
+
+// 10. 수지분석(P&L) 렌더링
+function renderPnl() {
+  if (!el('pnlMonth')) return;
+  const pm = el('pnlMonth').value;
+  if (!pm) return;
+
+  const txs = (appData.transactions || []).filter(t => String(t.date || '').startsWith(pm));
+
+  let totalInc = 0, totalExp = 0, depInc = 0, depExp = 0;
+  const incMap = {}, expMap = {};
+
+  TX_CATEGORIES.forEach(c => {
+    if (c.type === 'inc') incMap[c.val] = 0;
+    if (c.type === 'exp') expMap[c.val] = 0;
+  });
+  incMap[''] = 0;
+  expMap[''] = 0;
+
+  const depIncDetails = [], depExpDetails = [];
+
+  txs.forEach(t => {
+    const c = t.category || '';
+    if (c === 'transfer_in' || c === 'transfer_out') return;
+
+    if (t.income > 0) {
+      if (c === 'inc_dep_rent') {
+        const rentAmt = t.rentAmount || 0;
+        const depAmt = t.income - rentAmt;
+        if (rentAmt > 0) { totalInc += rentAmt; incMap['inc_rent'] = (incMap['inc_rent'] || 0) + rentAmt; }
+        if (depAmt > 0) { depInc += depAmt; depIncDetails.push({ date: t.date, room: t.matchedRoom, amt: depAmt, desc: t.desc }); }
+      } else if (c === 'inc_deposit') {
+        depInc += t.income;
+        depIncDetails.push({ date: t.date, room: t.matchedRoom, amt: t.income, desc: t.desc });
+      } else {
+        totalInc += t.income;
+        if (incMap[c] !== undefined) incMap[c] += t.income;
+        else incMap[''] += t.income;
+      }
+    }
+    if (t.expense > 0) {
+      if (c === 'exp_deposit') {
+        depExp += t.expense;
+        depExpDetails.push({ date: t.date, room: t.matchedRoom, amt: t.expense, desc: t.desc });
+      } else {
+        totalExp += t.expense;
+        if (expMap[c] !== undefined) expMap[c] += t.expense;
+        else expMap[''] += t.expense;
+      }
+    }
+  });
+
+  const net = totalInc - totalExp;
+  el('pnlTotalIncome').innerHTML = formatMoney(totalInc) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  el('pnlTotalExpense').innerHTML = formatMoney(totalExp) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+  el('pnlNetProfit').innerHTML = formatMoney(net) + '<span style="font-size:0.8rem;color:var(--dim);font-weight:600;">원</span>';
+
+  let incHtml = '';
+  TX_CATEGORIES.filter(c => c.type === 'inc').forEach(c => {
+    if (incMap[c.val] > 0) incHtml += `<div class="pnl-row"><span>${c.label}</span><span>${formatMoney(incMap[c.val])}원</span></div>`;
+  });
+  if (incMap[''] > 0) incHtml += `<div class="pnl-row"><span>⚠️ 미분류 수입</span><span style="color:var(--gold);">${formatMoney(incMap[''])}원</span></div>`;
+  if (!incHtml) incHtml = `<div class="pnl-row" style="color:var(--dim);">수입 내역이 없습니다.</div>`;
+  incHtml += `<div class="pnl-row total" style="color:#00d2ff;"><span>수입 합계</span><span>${formatMoney(totalInc)}원</span></div>`;
+  el('pnlIncomeList').innerHTML = incHtml;
+
+  let expHtml = '';
+  TX_CATEGORIES.filter(c => c.type === 'exp').forEach(c => {
+    if (expMap[c.val] > 0) expHtml += `<div class="pnl-row"><span>${c.label}</span><span>${formatMoney(expMap[c.val])}원</span></div>`;
+  });
+  if (expMap[''] > 0) expHtml += `<div class="pnl-row"><span>⚠️ 미분류 지출</span><span style="color:var(--gold);">${formatMoney(expMap[''])}원</span></div>`;
+  if (!expHtml) expHtml = `<div class="pnl-row" style="color:var(--dim);">지출 내역이 없습니다.</div>`;
+  expHtml += `<div class="pnl-row total" style="color:var(--red);"><span>지출 합계</span><span>${formatMoney(totalExp)}원</span></div>`;
+  el('pnlExpenseList').innerHTML = expHtml;
+
+  let depIncHtml = '';
+  depIncDetails.forEach(d => {
+    const roomStr = d.room ? `${d.room}호 ` : '';
+    depIncHtml += `<div class="pnl-row"><span>${roomStr}${d.desc} (${d.date.substr(5)})</span><span>${formatMoney(d.amt)}원</span></div>`;
+  });
+  if (!depIncHtml) depIncHtml = `<div class="pnl-row" style="color:var(--dim);">보증금 입금 내역이 없습니다.</div>`;
+  depIncHtml += `<div class="pnl-row total" style="color:#9d50bb;"><span>입금 합계</span><span>${formatMoney(depInc)}원</span></div>`;
+  if (el('pnlDepIncList')) el('pnlDepIncList').innerHTML = depIncHtml;
+
+  let depExpHtml = '';
+  depExpDetails.forEach(d => {
+    const roomStr = d.room ? `${d.room}호 ` : '';
+    depExpHtml += `<div class="pnl-row"><span>${roomStr}${d.desc} (${d.date.substr(5)})</span><span>${formatMoney(d.amt)}원</span></div>`;
+  });
+  if (!depExpHtml) depExpHtml = `<div class="pnl-row" style="color:var(--dim);">보증금 반환 내역이 없습니다.</div>`;
+  depExpHtml += `<div class="pnl-row total" style="color:#9d50bb;"><span>반환 합계</span><span>${formatMoney(depExp)}원</span></div>`;
+  if (el('pnlDepExpList')) el('pnlDepExpList').innerHTML = depExpHtml;
+}
 window.addEventListener('load', init);
 </script>
 </body>
